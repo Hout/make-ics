@@ -62,6 +62,28 @@ def get_trips(shift: dict, range_entry: dict | None) -> int | None:
     return int(default) if default is not None else None
 
 
+def get_shift_duration_minutes(
+    shift: dict,
+    range_entry: dict | None,
+    trips: int | None,
+    default_minutes: int,
+) -> int:
+    """Return shift duration in minutes.
+
+    Computes trips * trip_duration + (trips - 1) * break_duration when both
+    trips and trip_duration are available. Falls back to default_minutes otherwise.
+    Lookup order: range_entry fields override shift-level fields.
+    """
+    if not trips:
+        return default_minutes
+    merged = {**shift, **(range_entry or {})}
+    trip_duration = merged.get("trip_duration")
+    if trip_duration is None:
+        return default_minutes
+    break_duration = int(merged.get("break_duration", 0))
+    return int(trips) * int(trip_duration) + max(0, trips - 1) * break_duration
+
+
 def parse_dutch_date(date_str: str) -> date:
     """Parse a Dutch date string like '03-apr-26' using dateparser."""
     parsed = dateparser.parse(date_str.strip(), languages=["nl"])
@@ -138,6 +160,9 @@ def iter_events(
             advance = advance_minutes
 
         trips = get_trips(tr, range_entry)
+        duration_minutes = get_shift_duration_minutes(
+            tr, range_entry, trips, int(duration_hours * 60)
+        )
         description = f"Start {hour:02d}:{minute:02d}"
         if trips is not None:
             description += f"  |  Ritten: {trips}"
@@ -148,7 +173,7 @@ def iter_events(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
         )
         dt_start = dt_appt - timedelta(minutes=advance)
-        dt_end = dt_appt + timedelta(hours=duration_hours)
+        dt_end = dt_appt + timedelta(minutes=duration_minutes)
 
         event = Event()
         event.add("summary", summary)
@@ -158,7 +183,10 @@ def iter_events(
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        label = f"{appt_date} {hour:02d}:{minute:02d}  {summary}  (-{advance}min)"
+        label = (
+            f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
+            f"  (-{advance}min +{duration_minutes}min)"
+        )
         yield label, event
 
 

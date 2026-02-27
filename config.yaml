@@ -4,14 +4,16 @@ shift_type:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
     trips: 2
+    trip_duration: 90
+    break_duration: 15
     first_shift_advance: 30
     date_ranges:
       - from: 2026-04-01
         to:   2026-04-17
         first_shift_advance: 30
         start_times:
-          - times: ["14:40"]
-            trips: 3
+          - times: ["10:20", "14:40"]
+            trips: 1
       - from: 2026-04-18
         to:   2026-06-26
         first_shift_advance: 45

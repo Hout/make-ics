@@ -15,6 +15,7 @@ import pytest
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
     find_date_range,
+    get_shift_duration_minutes,
     get_trips,
     iter_events,
 )
@@ -71,8 +72,8 @@ def collect(ws, advance: int = DEFAULT_ADVANCE_MINUTES) -> list[tuple[str, objec
 
 
 def advance_of(label: str) -> int:
-    """Extract advance minutes from a label like '2026-04-03 10:00  ... (-45min)'."""
-    m = re.search(r"\(-(\d+)min\)", label)
+    """Extract advance minutes from a label like '... (-45min +195min)'."""
+    m = re.search(r"\(-(\d+)min", label)
     assert m, f"No advance found in label: {label!r}"
     return int(m.group(1))
 
@@ -194,6 +195,50 @@ def test_get_trips_range_trips_overrides_shift_trips():
 
 def test_get_trips_returns_none_when_no_trips_anywhere():
     assert get_trips({}, None) is None
+
+
+# ---------------------------------------------------------------------------
+# get_shift_duration_minutes
+# ---------------------------------------------------------------------------
+
+
+def test_duration_computes_single_trip():
+    shift = {"trip_duration": 90, "break_duration": 15}
+    assert get_shift_duration_minutes(shift, None, 1, 240) == 90
+
+
+def test_duration_computes_multiple_trips():
+    # 2 trips x 90min + 1 break x 15min = 195min
+    shift = {"trip_duration": 90, "break_duration": 15}
+    assert get_shift_duration_minutes(shift, None, 2, 240) == 195
+
+
+def test_duration_no_break_duration_defaults_to_zero():
+    # 3 trips x 60min + 2 breaks x 0min = 180min
+    shift = {"trip_duration": 60}
+    assert get_shift_duration_minutes(shift, None, 3, 240) == 180
+
+
+def test_duration_range_entry_overrides_shift():
+    shift = {"trip_duration": 90, "break_duration": 15, "trips": 2}
+    range_entry = {"trip_duration": 60, "break_duration": 10}
+    # 2 x 60 + 1 x 10 = 130
+    assert get_shift_duration_minutes(shift, range_entry, 2, 240) == 130
+
+
+def test_duration_falls_back_to_default_when_no_trip_duration():
+    shift = {"trips": 2}
+    assert get_shift_duration_minutes(shift, None, 2, 240) == 240
+
+
+def test_duration_falls_back_to_default_when_trips_is_none():
+    shift = {"trip_duration": 90}
+    assert get_shift_duration_minutes(shift, None, None, 240) == 240
+
+
+def test_duration_falls_back_to_default_when_trips_is_zero():
+    shift = {"trip_duration": 90}
+    assert get_shift_duration_minutes(shift, None, 0, 240) == 240
 
 
 # ---------------------------------------------------------------------------
