@@ -1,12 +1,13 @@
 """
-Reads an xlsx schedule file and generates an ICS calendar file for all
-appointment rows, packaged in a zip file with the same name as the input.
+Reads an xlsx schedule file and generates one ICS file per appointment,
+each named after the appointment date, packaged in a zip file.
 """
 
 import argparse
 import re
 import uuid
 import zipfile
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from icalendar import Calendar, Event
 
 # --- Configuration ---
 DEFAULT_DURATION_HOURS = 4
+DEFAULT_ADVANCE_MINUTES = 30
 TIMEZONE = datetime.now().astimezone().tzinfo
 
 
@@ -46,16 +48,24 @@ def is_data_row(row: tuple) -> bool:
     return bool(re.match(r"\d{2}-[a-zA-Z]{3}-\d{2}", date_str))
 
 
-def build_calendar(
-    ws, name: str = "calendar", duration_hours: float = DEFAULT_DURATION_HOURS
-) -> Calendar:
+def make_single_event_calendar(name: str, event: Event) -> Calendar:
+    """Wrap a single Event in a minimal Calendar."""
     cal = Calendar()
     cal.add("prodid", f"-//make-ics//{name}//NL")
     cal.add("version", "2.0")
     cal.add("calscale", "GREGORIAN")
     cal.add("method", "PUBLISH")
+    cal.add_component(event)
+    return cal
 
-    count = 0
+
+def iter_appointment_calendars(
+    ws,
+    name: str = "calendar",
+    duration_hours: float = DEFAULT_DURATION_HOURS,
+    advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
+) -> Iterator[tuple[str, Calendar]]:
+    """Yield (ics_filename, Calendar) for each appointment row in the worksheet."""
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
             continue
@@ -70,10 +80,11 @@ def build_calendar(
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
 
-        dt_start = datetime(
+        dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
         )
-        dt_end = dt_start + timedelta(hours=duration_hours)
+        dt_start = dt_appt - timedelta(minutes=advance_minutes)
+        dt_end = dt_appt + timedelta(hours=duration_hours)
 
         event = Event()
         event.add("summary", dienst)
@@ -82,12 +93,9 @@ def build_calendar(
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        cal.add_component(event)
-        count += 1
-        print(f"  + {appt_date} {hour:02d}:{minute:02d}  →  {dienst}")
-
-    print(f"\nTotal events added: {count}")
-    return cal
+        ics_filename = f"{appt_date}.ics"
+        yield ics_filename, make_single_event_calendar(name, event)
+        print(f"  + {appt_date} {hour:02d}:{minute:02d}  (-{advance_minutes}min)  →  {dienst}")
 
 
 def main():
@@ -108,6 +116,17 @@ def main():
         metavar="HOURS",
         help=f"Duration of each appointment in hours (default: {DEFAULT_DURATION_HOURS})",
     )
+    parser.add_argument(
+        "-a",
+        "--advance",
+        type=int,
+        default=DEFAULT_ADVANCE_MINUTES,
+        metavar="MINUTES",
+        help=(
+            f"Start event N minutes before the appointment time"
+            f" (default: {DEFAULT_ADVANCE_MINUTES})"
+        ),
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -119,16 +138,17 @@ def main():
     ws = wb.active
     print(f"Sheet: {ws.title}\n")
 
-    cal = build_calendar(ws, name=input_path.stem, duration_hours=args.duration)
-
-    ics_name = input_path.stem + ".ics"
     zip_path = input_path.with_suffix(".zip")
-
-    ics_bytes = cal.to_ical()
+    count = 0
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(ics_name, ics_bytes)
+        for ics_name, cal in iter_appointment_calendars(
+            ws, name=input_path.stem, duration_hours=args.duration, advance_minutes=args.advance
+        ):
+            zf.writestr(ics_name, cal.to_ical())
+            count += 1
 
-    print(f"\nWritten {ics_name} into {zip_path.resolve()}")
+    print(f"\nTotal events written: {count}")
+    print(f"Written into {zip_path.resolve()}")
 
 
 if __name__ == "__main__":
