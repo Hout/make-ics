@@ -22,13 +22,24 @@ TIMEZONE = datetime.now().astimezone().tzinfo
 TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
 
 
-def load_translations() -> dict[str, dict[str, str]]:
-    """Load abbreviation translations from config.yaml."""
+def load_config() -> dict:
+    """Load config.yaml, returning an empty dict if the file is missing."""
     if not TRANSLATIONS_FILE.exists():
         return {}
     with TRANSLATIONS_FILE.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data or {}
+        return yaml.safe_load(f) or {}
+
+
+def get_advance_minutes(
+    appt_date: date,
+    date_ranges: list[dict],
+    default: int,
+) -> int:
+    """Return the advance minutes for appt_date based on configured date ranges."""
+    for entry in date_ranges:
+        if entry["from"] <= appt_date <= entry["to"]:
+            return int(entry["time_in_advance"])
+    return default
 
 
 def parse_dutch_date(date_str: str) -> date:
@@ -73,6 +84,7 @@ def iter_events(
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
     translations: dict[str, dict[str, str]] | None = None,
+    date_ranges: list[dict] | None = None,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
     for row in ws.iter_rows(values_only=True):
@@ -96,10 +108,11 @@ def iter_events(
         if tr_description:
             description += f"\n{tr_description}"
 
+        advance = get_advance_minutes(appt_date, date_ranges or [], advance_minutes)
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
         )
-        dt_start = dt_appt - timedelta(minutes=advance_minutes)
+        dt_start = dt_appt - timedelta(minutes=advance)
         dt_end = dt_appt + timedelta(hours=duration_hours)
 
         event = Event()
@@ -110,7 +123,7 @@ def iter_events(
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        label = f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
+        label = f"{appt_date} {hour:02d}:{minute:02d}  {summary}  (-{advance}min)"
         yield label, event
 
 
@@ -155,7 +168,9 @@ def main():
     print(f"Sheet: {ws.title}\n")
 
     ics_path = input_path.with_suffix(".ics")
-    translations = load_translations()
+    config = load_config()
+    translations = config.get("translations") or {}
+    date_ranges = config.get("date_ranges") or []
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
@@ -163,10 +178,11 @@ def main():
         duration_hours=args.duration,
         advance_minutes=args.advance,
         translations=translations,
+        date_ranges=date_ranges,
     ):
         cal.add_component(event)
         count += 1
-        print(f"  + {label}  (-{args.advance}min)")
+        print(f"  + {label}")
 
     ics_path.write_bytes(cal.to_ical())
     print(f"\nTotal events written: {count}")
