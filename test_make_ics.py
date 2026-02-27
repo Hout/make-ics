@@ -198,6 +198,53 @@ def test_date_outside_all_ranges_gets_default_advance():
     assert advance_of(labels[0]) == 30
 
 
+def test_date_outside_all_ranges_uses_shift_level_first_shift_advance():
+    """Shift-level first_shift_advance is used when no date range matches."""
+    shift_types = {
+        "HRm_": {
+            "first_shift_advance": 25,
+            "date_ranges": [
+                {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45},
+            ],
+        }
+    }
+    ws = make_ws(("03-jul-26", "HRm_", "10:00 uur"))
+    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
+    assert advance_of(labels[0]) == 25
+
+
+def test_range_first_shift_advance_overrides_shift_level():
+    """Date range first_shift_advance wins over shift-level when both are set."""
+    shift_types = {
+        "HRm_": {
+            "first_shift_advance": 25,
+            "date_ranges": [
+                {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45},
+            ],
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRm_", "10:00 uur"))
+    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
+    assert advance_of(labels[0]) == 45
+
+
+def test_shift_level_first_shift_advance_not_applied_to_second_shift():
+    """Shift-level first_shift_advance must not affect subsequent same-day shifts."""
+    shift_types = {
+        "HRm_": {
+            "first_shift_advance": 25,
+            "date_ranges": [],
+        }
+    }
+    ws = make_ws(
+        ("03-apr-26", "HRm_", "10:00 uur"),
+        ("03-apr-26", "HRm_", "14:00 uur"),
+    )
+    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
+    assert advance_of(labels[0]) == 25  # first shift → shift level
+    assert advance_of(labels[1]) == 30  # second shift → CLI default
+
+
 def test_unknown_shift_code_gets_default_advance():
     ws = make_ws(("03-apr-26", "UNKNOWN", "10:00 uur"))
     labels = [label for label, _ in collect(ws, advance=30)]

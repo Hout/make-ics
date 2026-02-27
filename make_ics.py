@@ -136,7 +136,12 @@ def iter_events(
         raw_ranges = tr.get("date_ranges")
         date_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
         range_entry = find_date_range(date_ranges, appt_date, start_time) if is_first else None
-        advance = int(range_entry["first_shift_advance"]) if range_entry else advance_minutes
+        if range_entry and "first_shift_advance" in range_entry:
+            advance = int(range_entry["first_shift_advance"])
+        elif is_first and "first_shift_advance" in tr:
+            advance = int(tr["first_shift_advance"])
+        else:
+            advance = advance_minutes
 
         trips = get_trips(tr, range_entry)
         description = f"Start {hour:02d}:{minute:02d}"
