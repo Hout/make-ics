@@ -29,7 +29,7 @@ RANGES = [
 ]
 RANGES_WITH_SPECIFIC = [
     {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 30},
-    {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "14:40", "trips": 3},
+    {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_times": ["14:40"], "trips": 3},
 ]
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,12 @@ SHIFT_TYPES = {
         "trips": 2,
         "date_ranges": [
             {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45},
-            {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "14:40", "trips": 3},
+            {
+                "from": date(2026, 4, 1),
+                "to": date(2026, 4, 30),
+                "start_times": ["14:40"],
+                "trips": 3,
+            },
         ],
     }
 }
@@ -104,7 +109,25 @@ def test_find_date_range_returns_merged_when_start_time_matches():
     assert result is not None
     assert result["first_shift_advance"] == 30  # from general
     assert result["trips"] == 3  # from specific
-    assert result["start_time"] == "14:40"  # from specific
+    assert "14:40" in result["start_times"]  # from specific
+
+
+def test_find_date_range_returns_merged_when_one_of_multiple_start_times_matches():
+    ranges = [
+        {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 30},
+        {
+            "from": date(2026, 4, 1),
+            "to": date(2026, 4, 30),
+            "start_times": ["10:00", "14:40"],
+            "trips": 3,
+        },
+    ]
+    result = find_date_range(ranges, date(2026, 4, 10), "14:40")
+    assert result is not None
+    assert result["trips"] == 3
+    result2 = find_date_range(ranges, date(2026, 4, 10), "10:00")
+    assert result2 is not None
+    assert result2["trips"] == 3
 
 
 def test_find_date_range_returns_general_when_start_time_no_match():
@@ -120,7 +143,7 @@ def test_find_date_range_returns_general_when_no_start_time_given():
 def test_find_date_range_specific_field_overrides_general():
     ranges = [
         {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "trips": 2, "first_shift_advance": 30},
-        {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "09:00", "trips": 5},
+        {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_times": ["09:00"], "trips": 5},
     ]
     result = find_date_range(ranges, date(2026, 4, 10), "09:00")
     assert result is not None

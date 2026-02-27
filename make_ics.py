@@ -36,20 +36,23 @@ def find_date_range(
     """Return a merged date range entry for appt_date.
 
     Scans date_ranges for entries whose from/to span covers appt_date.
-    Entries without a start_time field are treated as general; entries with a
-    matching start_time field are specific. If both are found the specific entry
-    is merged on top of the general one, so its fields take precedence.
+    Entries without a start_times field are treated as general; entries with a
+    matching start_times list containing start_time are specific. If both are
+    found the specific entry is merged on top of the general one, so its fields
+    take precedence.
     """
     general: dict | None = None
     specific: dict | None = None
     for entry in date_ranges:
         if not (entry["from"] <= appt_date <= entry["to"]):
             continue
-        entry_start = entry.get("start_time")
-        if entry_start is None:
+        entry_starts = entry.get("start_times")
+        if entry_starts is None:
             if general is None:
                 general = entry
-        elif start_time and str(entry_start).strip() == start_time and specific is None:
+        elif (
+            start_time and start_time in [str(s).strip() for s in entry_starts] and specific is None
+        ):
             specific = entry
     if general is None and specific is None:
         return None
