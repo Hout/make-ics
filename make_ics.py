@@ -177,7 +177,7 @@ def main():
 
     ics_path = input_path.with_suffix(".ics")
     config = load_config()
-    translations = config.get("translations") or {}
+    translations = config.get("trip_type") or {}
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(

@@ -1,5 +1,5 @@
-# Translations for appointment abbreviations used in the xlsx schedule.
-translations:
+# Trip type definitions for appointment abbreviations used in the xlsx schedule.
+trip_type:
   HRm_:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
