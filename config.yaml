@@ -1,8 +1,13 @@
-# Trip type definitions for appointment abbreviations used in the xlsx schedule.
-trip_type:
+# Shift type definitions for appointment abbreviations used in the xlsx schedule.
+shift_type:
   HRm_:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
+    trips: 2
+    # Override trip count for specific start times.
+    # trip_overrides:
+    #   - start_time: "14:40"
+    #     trips: 3
     first_shift_advance:
       - from: 2026-04-01
         to:   2026-04-30

@@ -42,6 +42,16 @@ def get_advance_minutes(
     return default
 
 
+def get_trips(shift: dict, hour: int, minute: int) -> int | None:
+    """Return trip count for a start time, checking trip_overrides first."""
+    start = f"{hour:02d}:{minute:02d}"
+    for override in shift.get("trip_overrides") or []:
+        if str(override.get("start_time", "")).strip() == start:
+            return int(override["trips"])
+    default = shift.get("trips")
+    return int(default) if default is not None else None
+
+
 def parse_dutch_date(date_str: str) -> date:
     """Parse a Dutch date string like '03-apr-26' using dateparser."""
     parsed = dateparser.parse(date_str.strip(), languages=["nl"])
@@ -83,7 +93,7 @@ def iter_events(
     ws,
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
-    translations: dict[str, dict[str, str]] | None = None,
+    shift_types: dict[str, dict] | None = None,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
     first_shift_seen: dict[tuple[str, date], bool] = {}
@@ -93,7 +103,7 @@ def iter_events(
 
         date_str, dienst_str, time_str = row
         code = str(dienst_str).strip() if dienst_str else "Afspraak"
-        tr = (translations or {}).get(code, {})
+        tr = (shift_types or {}).get(code, {})
         summary = tr.get("summary", code)
         tr_description = tr.get("description")
 
@@ -105,6 +115,9 @@ def iter_events(
             continue
 
         description = f"Start {hour:02d}:{minute:02d}"
+        trips = get_trips(tr, hour, minute)
+        if trips is not None:
+            description += f"  |  Ritten: {trips}"
         if tr_description:
             description += f"\n{tr_description}"
 
@@ -177,14 +190,14 @@ def main():
 
     ics_path = input_path.with_suffix(".ics")
     config = load_config()
-    translations = config.get("trip_type") or {}
+    shift_types = config.get("shift_type") or {}
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
         ws,
         duration_hours=args.duration,
         advance_minutes=args.advance,
-        translations=translations,
+        shift_types=shift_types,
     ):
         cal.add_component(event)
         count += 1
