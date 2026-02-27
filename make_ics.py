@@ -19,11 +19,11 @@ from icalendar import Calendar, Event
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
 TIMEZONE = datetime.now().astimezone().tzinfo
-TRANSLATIONS_FILE = Path(__file__).parent / "translations.yaml"
+TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
 
 
 def load_translations() -> dict[str, dict[str, str]]:
-    """Load abbreviation translations from translations.yaml."""
+    """Load abbreviation translations from config.yaml."""
     if not TRANSLATIONS_FILE.exists():
         return {}
     with TRANSLATIONS_FILE.open(encoding="utf-8") as f:
