@@ -7,7 +7,7 @@ import argparse
 import re
 import uuid
 import zipfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import dateparser
@@ -46,7 +46,9 @@ def is_data_row(row: tuple) -> bool:
     return bool(re.match(r"\d{2}-[a-zA-Z]{3}-\d{2}", date_str))
 
 
-def build_calendar(ws, name: str = "calendar", duration_hours: float = DEFAULT_DURATION_HOURS) -> Calendar:
+def build_calendar(
+    ws, name: str = "calendar", duration_hours: float = DEFAULT_DURATION_HOURS
+) -> Calendar:
     cal = Calendar()
     cal.add("prodid", f"-//make-ics//{name}//NL")
     cal.add("version", "2.0")
@@ -68,15 +70,16 @@ def build_calendar(ws, name: str = "calendar", duration_hours: float = DEFAULT_D
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
 
-        dt_start = datetime(appt_date.year, appt_date.month, appt_date.day,
-                            hour, minute, tzinfo=TIMEZONE)
+        dt_start = datetime(
+            appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
+        )
         dt_end = dt_start + timedelta(hours=duration_hours)
 
         event = Event()
         event.add("summary", dienst)
         event.add("dtstart", dt_start)
         event.add("dtend", dt_end)
-        event.add("dtstamp", datetime.now(tz=timezone.utc))
+        event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
         cal.add_component(event)
@@ -98,7 +101,8 @@ def main():
         help="Path to the input xlsx file (default: report.xlsx)",
     )
     parser.add_argument(
-        "-d", "--duration",
+        "-d",
+        "--duration",
         type=float,
         default=DEFAULT_DURATION_HOURS,
         metavar="HOURS",
