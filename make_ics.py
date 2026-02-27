@@ -84,9 +84,9 @@ def iter_events(
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
     translations: dict[str, dict[str, str]] | None = None,
-    date_ranges: list[dict] | None = None,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
+    first_shift_seen: dict[tuple[str, date], bool] = {}
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
             continue
@@ -108,7 +108,15 @@ def iter_events(
         if tr_description:
             description += f"\n{tr_description}"
 
-        advance = get_advance_minutes(appt_date, date_ranges or [], advance_minutes)
+        is_first = not first_shift_seen.get((code, appt_date), False)
+        first_shift_seen[(code, appt_date)] = True
+        raw_ranges = tr.get("first_shift_advance")
+        first_shift_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
+        if is_first and first_shift_ranges:
+            advance = get_advance_minutes(appt_date, first_shift_ranges, advance_minutes)
+        else:
+            advance = advance_minutes
+
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
         )
@@ -170,7 +178,6 @@ def main():
     ics_path = input_path.with_suffix(".ics")
     config = load_config()
     translations = config.get("translations") or {}
-    date_ranges = config.get("date_ranges") or []
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
@@ -178,7 +185,6 @@ def main():
         duration_hours=args.duration,
         advance_minutes=args.advance,
         translations=translations,
-        date_ranges=date_ranges,
     ):
         cal.add_component(event)
         count += 1

@@ -3,13 +3,12 @@ translations:
   HRm_:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
-
-# Optional date ranges that override the default time_in_advance (minutes).
-# Ranges are checked in order; the first match wins.
-# date_ranges:
-#   - from: 2026-04-01
-#     to:   2026-04-30
-#     time_in_advance: 45
-#   - from: 2026-05-01
-#     to:   2026-06-30
-#     time_in_advance: 20
+    # Override time_in_advance for the first shift of this type on a given day.
+    # Ranges are checked in order; the first match wins.
+    # first_shift_advance:
+    #   - from: 2026-04-01
+    #     to:   2026-04-30
+    #     time_in_advance: 45
+    #   - from: 2026-05-01
+    #     to:   2026-06-30
+    #     time_in_advance: 20
