@@ -121,8 +121,7 @@ def main():
 
     cal = build_calendar(ws, name=input_path.stem, duration_hours=args.duration)
 
-    stem = input_path.stem
-    ics_name = stem + ".ics"
+    ics_name = input_path.stem + ".ics"
     zip_path = input_path.with_suffix(".zip")
 
     ics_bytes = cal.to_ical()
