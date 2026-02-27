@@ -8,12 +8,10 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to:   2026-04-17
-        start_times: ["14:40"]
-        trips: 3
-      - from: 2026-04-01
-        to:   2026-04-17
-        start_times: ["14:40"]
-        trips: 1
+        first_shift_advance: 30
+        start_times:
+          - times: ["14:40"]
+            trips: 3
       - from: 2026-04-18
         to:   2026-06-26
         first_shift_advance: 45
@@ -23,4 +21,3 @@ shift_type:
       - from: 2026-08-01
         to:   2026-10-31
         first_shift_advance: 30
-        

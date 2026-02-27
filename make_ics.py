@@ -35,32 +35,23 @@ def find_date_range(
 ) -> dict | None:
     """Return a merged date range entry for appt_date.
 
-    Scans date_ranges for entries whose from/to span covers appt_date.
-    Entries without a start_times field are treated as general; entries with a
-    matching start_times list containing start_time are specific. If both are
-    found the specific entry is merged on top of the general one, so its fields
-    take precedence.
+    Finds the first date range entry whose from/to span covers appt_date.
+    If that entry has a start_times list of groups and start_time matches a
+    group's times list, the group's fields are merged on top of the entry
+    (group takes precedence). start_times and times are excluded from the result.
     """
-    general: dict | None = None
-    specific: dict | None = None
     for entry in date_ranges:
         if not (entry["from"] <= appt_date <= entry["to"]):
             continue
-        entry_starts = entry.get("start_times")
-        if entry_starts is None:
-            if general is None:
-                general = entry
-        elif (
-            start_time and start_time in [str(s).strip() for s in entry_starts] and specific is None
-        ):
-            specific = entry
-    if general is None and specific is None:
-        return None
-    if specific is None:
-        return general
-    if general is None:
-        return specific
-    return {**general, **specific}
+        if start_time:
+            for group in entry.get("start_times") or []:
+                times = [str(t).strip() for t in (group.get("times") or [])]
+                if start_time in times:
+                    base = {k: v for k, v in entry.items() if k != "start_times"}
+                    overrides = {k: v for k, v in group.items() if k != "times"}
+                    return {**base, **overrides}
+        return entry
+    return None
 
 
 def get_trips(shift: dict, range_entry: dict | None) -> int | None:
