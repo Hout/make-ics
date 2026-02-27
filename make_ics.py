@@ -12,12 +12,23 @@ from pathlib import Path
 
 import dateparser
 import openpyxl
+import yaml
 from icalendar import Calendar, Event
 
 # --- Configuration ---
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
 TIMEZONE = datetime.now().astimezone().tzinfo
+TRANSLATIONS_FILE = Path(__file__).parent / "translations.yaml"
+
+
+def load_translations() -> dict[str, dict[str, str]]:
+    """Load abbreviation translations from translations.yaml."""
+    if not TRANSLATIONS_FILE.exists():
+        return {}
+    with TRANSLATIONS_FILE.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return data or {}
 
 
 def parse_dutch_date(date_str: str) -> date:
@@ -61,6 +72,7 @@ def iter_events(
     ws,
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
+    translations: dict[str, dict[str, str]] | None = None,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
     for row in ws.iter_rows(values_only=True):
@@ -68,7 +80,10 @@ def iter_events(
             continue
 
         date_str, dienst_str, time_str = row
-        dienst = str(dienst_str).strip() if dienst_str else "Afspraak"
+        code = str(dienst_str).strip() if dienst_str else "Afspraak"
+        tr = (translations or {}).get(code, {})
+        summary = tr.get("summary", code)
+        description = tr.get("description")
 
         try:
             appt_date = parse_dutch_date(str(date_str))
@@ -84,13 +99,15 @@ def iter_events(
         dt_end = dt_appt + timedelta(hours=duration_hours)
 
         event = Event()
-        event.add("summary", dienst)
+        event.add("summary", summary)
+        if description:
+            event.add("description", description)
         event.add("dtstart", dt_start)
         event.add("dtend", dt_end)
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        label = f"{appt_date} {hour:02d}:{minute:02d}"
+        label = f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
         yield label, event
 
 
@@ -135,9 +152,15 @@ def main():
     print(f"Sheet: {ws.title}\n")
 
     ics_path = input_path.with_suffix(".ics")
+    translations = load_translations()
     cal = make_calendar(input_path.stem)
     count = 0
-    for label, event in iter_events(ws, duration_hours=args.duration, advance_minutes=args.advance):
+    for label, event in iter_events(
+        ws,
+        duration_hours=args.duration,
+        advance_minutes=args.advance,
+        translations=translations,
+    ):
         cal.add_component(event)
         count += 1
         print(f"  + {label}  (-{args.advance}min)")

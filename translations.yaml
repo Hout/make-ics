@@ -1,0 +1,6 @@
+# Translations for appointment abbreviations used in the xlsx schedule.
+# Each entry maps the raw abbreviation to an ICS summary and description.
+
+HRm_:
+  summary: "Binnendieze HRM"
+  description: "Binnendieze; Historische route Molenstraat"
