@@ -83,7 +83,7 @@ def iter_events(
         code = str(dienst_str).strip() if dienst_str else "Afspraak"
         tr = (translations or {}).get(code, {})
         summary = tr.get("summary", code)
-        description = tr.get("description")
+        tr_description = tr.get("description")
 
         try:
             appt_date = parse_dutch_date(str(date_str))
@@ -91,6 +91,10 @@ def iter_events(
         except ValueError as exc:
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
+
+        description = f"Start {hour:02d}:{minute:02d}"
+        if tr_description:
+            description += f"\n{tr_description}"
 
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
@@ -100,8 +104,7 @@ def iter_events(
 
         event = Event()
         event.add("summary", summary)
-        if description:
-            event.add("description", description)
+        event.add("description", description)
         event.add("dtstart", dt_start)
         event.add("dtend", dt_end)
         event.add("dtstamp", datetime.now(tz=UTC))
