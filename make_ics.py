@@ -96,7 +96,7 @@ def iter_events(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert an xlsx schedule to an ICS file inside a zip archive."
+        description="Convert an xlsx schedule to a single ICS calendar file."
     )
     parser.add_argument(
         "input",
@@ -134,7 +134,7 @@ def main():
     ws = wb.active
     print(f"Sheet: {ws.title}\n")
 
-    zip_path = input_path.with_suffix(".ics")
+    ics_path = input_path.with_suffix(".ics")
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(ws, duration_hours=args.duration, advance_minutes=args.advance):
@@ -142,9 +142,9 @@ def main():
         count += 1
         print(f"  + {label}  (-{args.advance}min)")
 
-    zip_path.write_bytes(cal.to_ical())
+    ics_path.write_bytes(cal.to_ical())
     print(f"\nTotal events written: {count}")
-    print(f"Written to {zip_path.resolve()}")
+    print(f"Written to {ics_path.resolve()}")
 
 
 if __name__ == "__main__":
