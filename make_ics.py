@@ -38,7 +38,7 @@ def get_advance_minutes(
     """Return the advance minutes for appt_date based on configured date ranges."""
     for entry in date_ranges:
         if entry["from"] <= appt_date <= entry["to"]:
-            return int(entry["time_in_advance"])
+            return int(entry["advance_minutes"])
     return default
 
 
