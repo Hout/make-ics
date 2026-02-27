@@ -6,11 +6,19 @@ shift_type:
     trips: 2
     date_ranges:
       - from: 2026-04-01
-        to:   2026-04-30
+        to:   2026-04-17
+        first_shift_advance: 30
+      - from: 2026-04-01
+        to:   2026-04-17
+        start_time: "14:40"
+        trips: 3
+      - from: 2026-04-18
+        to:   2026-06-26
         first_shift_advance: 45
-        # trip_overrides:
-        #   - start_time: "14:40"
-        #     trips: 3
-      - from: 2026-05-01
-        to:   2026-06-30
-        first_shift_advance: 20
+      - from: 2026-06-27
+        to:   2026-08-31
+        first_shift_advance: 60
+      - from: 2026-08-01
+        to:   2026-10-31
+        first_shift_advance: 30
+        

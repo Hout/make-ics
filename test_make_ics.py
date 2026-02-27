@@ -20,6 +20,19 @@ from make_ics import (
 )
 
 # ---------------------------------------------------------------------------
+# Shared date range fixtures
+# ---------------------------------------------------------------------------
+
+RANGES = [
+    {"from": date(2026, 4, 1), "to": date(2026, 4, 17), "first_shift_advance": 30},
+    {"from": date(2026, 4, 18), "to": date(2026, 6, 26), "first_shift_advance": 45},
+]
+RANGES_WITH_SPECIFIC = [
+    {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 30},
+    {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "14:40", "trips": 3},
+]
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -28,14 +41,8 @@ SHIFT_TYPES = {
         "summary": "Binnendieze HRM",
         "trips": 2,
         "date_ranges": [
-            {
-                "from": date(2026, 4, 1),
-                "to": date(2026, 4, 30),
-                "first_shift_advance": 45,
-                "trip_overrides": [
-                    {"start_time": "14:40", "trips": 3},
-                ],
-            },
+            {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45},
+            {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "14:40", "trips": 3},
         ],
     }
 }
@@ -48,9 +55,7 @@ def make_ws(*rows: tuple) -> MagicMock:
 
 
 def collect(ws, advance: int = DEFAULT_ADVANCE_MINUTES) -> list[tuple[str, object]]:
-    return list(
-        iter_events(ws, duration_hours=4, advance_minutes=advance, shift_types=SHIFT_TYPES)
-    )
+    return list(iter_events(ws, duration_hours=4, advance_minutes=advance, shift_types=SHIFT_TYPES))
 
 
 def advance_of(label: str) -> int:
@@ -64,11 +69,6 @@ def advance_of(label: str) -> int:
 # find_date_range
 # ---------------------------------------------------------------------------
 
-RANGES = [
-    {"from": date(2026, 4, 1), "to": date(2026, 4, 17), "first_shift_advance": 30},
-    {"from": date(2026, 4, 18), "to": date(2026, 6, 26), "first_shift_advance": 45},
-]
-
 
 def test_find_date_range_matches_first_entry():
     assert find_date_range(RANGES, date(2026, 4, 10)) is RANGES[0]
@@ -81,7 +81,7 @@ def test_find_date_range_matches_second_entry():
 @pytest.mark.parametrize(
     "d, expected_idx",
     [
-        (date(2026, 4, 1), 0),   # start boundary first range
+        (date(2026, 4, 1), 0),  # start boundary first range
         (date(2026, 4, 17), 0),  # end boundary first range
         (date(2026, 4, 18), 1),  # start boundary second range
         (date(2026, 6, 26), 1),  # end boundary second range
@@ -99,38 +99,63 @@ def test_find_date_range_empty_list():
     assert find_date_range([], date(2026, 4, 1)) is None
 
 
+def test_find_date_range_returns_merged_when_start_time_matches():
+    result = find_date_range(RANGES_WITH_SPECIFIC, date(2026, 4, 10), "14:40")
+    assert result is not None
+    assert result["first_shift_advance"] == 30  # from general
+    assert result["trips"] == 3  # from specific
+    assert result["start_time"] == "14:40"  # from specific
+
+
+def test_find_date_range_returns_general_when_start_time_no_match():
+    result = find_date_range(RANGES_WITH_SPECIFIC, date(2026, 4, 10), "10:00")
+    assert result is RANGES_WITH_SPECIFIC[0]  # general only
+
+
+def test_find_date_range_returns_general_when_no_start_time_given():
+    result = find_date_range(RANGES_WITH_SPECIFIC, date(2026, 4, 10))
+    assert result is RANGES_WITH_SPECIFIC[0]
+
+
+def test_find_date_range_specific_field_overrides_general():
+    ranges = [
+        {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "trips": 2, "first_shift_advance": 30},
+        {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "start_time": "09:00", "trips": 5},
+    ]
+    result = find_date_range(ranges, date(2026, 4, 10), "09:00")
+    assert result is not None
+    assert result["trips"] == 5  # specific overrides general
+
+
 # ---------------------------------------------------------------------------
 # get_trips
 # ---------------------------------------------------------------------------
 
 SHIFT = {"trips": 2}
-RANGE_WITH_OVERRIDE = {
-    "from": date(2026, 4, 1),
-    "to": date(2026, 4, 30),
-    "first_shift_advance": 45,
-    "trip_overrides": [{"start_time": "14:40", "trips": 3}],
-}
-RANGE_WITHOUT_OVERRIDE = {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45}
+RANGE_WITH_TRIPS = {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "trips": 3}
+RANGE_WITHOUT_TRIPS = {"from": date(2026, 4, 1), "to": date(2026, 4, 30), "first_shift_advance": 45}
 
 
-def test_get_trips_returns_default_when_no_range():
-    assert get_trips(SHIFT, None, 10, 0) == 2
+def test_get_trips_returns_shift_default_when_no_range():
+    assert get_trips(SHIFT, None) == 2
 
 
-def test_get_trips_returns_default_when_range_has_no_overrides():
-    assert get_trips(SHIFT, RANGE_WITHOUT_OVERRIDE, 10, 0) == 2
+def test_get_trips_returns_shift_default_when_range_has_no_trips():
+    assert get_trips(SHIFT, RANGE_WITHOUT_TRIPS) == 2
 
 
-def test_get_trips_override_matches_start_time():
-    assert get_trips(SHIFT, RANGE_WITH_OVERRIDE, 14, 40) == 3
+def test_get_trips_returns_range_trips_when_present():
+    assert get_trips(SHIFT, RANGE_WITH_TRIPS) == 3
 
 
-def test_get_trips_override_does_not_match_start_time():
-    assert get_trips(SHIFT, RANGE_WITH_OVERRIDE, 10, 0) == 2
+def test_get_trips_range_trips_overrides_shift_trips():
+    shift_with_trips = {"trips": 2}
+    range_with_different = {"trips": 5}
+    assert get_trips(shift_with_trips, range_with_different) == 5
 
 
-def test_get_trips_returns_none_when_no_trips_field():
-    assert get_trips({}, None, 10, 0) is None
+def test_get_trips_returns_none_when_no_trips_anywhere():
+    assert get_trips({}, None) is None
 
 
 # ---------------------------------------------------------------------------

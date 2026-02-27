@@ -30,21 +30,41 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def find_date_range(date_ranges: list[dict], appt_date: date) -> dict | None:
-    """Return the first matching date range entry for appt_date, or None."""
+def find_date_range(
+    date_ranges: list[dict], appt_date: date, start_time: str | None = None
+) -> dict | None:
+    """Return a merged date range entry for appt_date.
+
+    Scans date_ranges for entries whose from/to span covers appt_date.
+    Entries without a start_time field are treated as general; entries with a
+    matching start_time field are specific. If both are found the specific entry
+    is merged on top of the general one, so its fields take precedence.
+    """
+    general: dict | None = None
+    specific: dict | None = None
     for entry in date_ranges:
-        if entry["from"] <= appt_date <= entry["to"]:
-            return entry
-    return None
+        if not (entry["from"] <= appt_date <= entry["to"]):
+            continue
+        entry_start = entry.get("start_time")
+        if entry_start is None:
+            if general is None:
+                general = entry
+        elif start_time and str(entry_start).strip() == start_time and specific is None:
+            specific = entry
+    if general is None and specific is None:
+        return None
+    if specific is None:
+        return general
+    if general is None:
+        return specific
+    return {**general, **specific}
 
 
-def get_trips(shift: dict, range_entry: dict | None, hour: int, minute: int) -> int | None:
-    """Return trip count for a start time, checking range trip_overrides first."""
-    start = f"{hour:02d}:{minute:02d}"
-    for override in (range_entry or {}).get("trip_overrides") or []:
-        if str(override.get("start_time", "")).strip() == start:
-            return int(override["trips"])
-    default = shift.get("trips")
+def get_trips(shift: dict, range_entry: dict | None) -> int | None:
+    """Return trip count from the resolved range entry, falling back to shift default."""
+    default = (range_entry or {}).get("trips") if range_entry else None
+    if default is None:
+        default = shift.get("trips")
     return int(default) if default is not None else None
 
 
@@ -110,14 +130,15 @@ def iter_events(
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
 
+        start_time = f"{hour:02d}:{minute:02d}"
         is_first = not first_shift_seen.get((code, appt_date), False)
         first_shift_seen[(code, appt_date)] = True
         raw_ranges = tr.get("date_ranges")
         date_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
-        range_entry = find_date_range(date_ranges, appt_date) if is_first else None
+        range_entry = find_date_range(date_ranges, appt_date, start_time) if is_first else None
         advance = int(range_entry["first_shift_advance"]) if range_entry else advance_minutes
 
-        trips = get_trips(tr, range_entry, hour, minute)
+        trips = get_trips(tr, range_entry)
         description = f"Start {hour:02d}:{minute:02d}"
         if trips is not None:
             description += f"  |  Ritten: {trips}"
