@@ -30,22 +30,18 @@ def load_config() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def get_advance_minutes(
-    appt_date: date,
-    date_ranges: list[dict],
-    default: int,
-) -> int:
-    """Return the advance minutes for appt_date based on configured date ranges."""
+def find_date_range(date_ranges: list[dict], appt_date: date) -> dict | None:
+    """Return the first matching date range entry for appt_date, or None."""
     for entry in date_ranges:
         if entry["from"] <= appt_date <= entry["to"]:
-            return int(entry["advance_minutes"])
-    return default
+            return entry
+    return None
 
 
-def get_trips(shift: dict, hour: int, minute: int) -> int | None:
-    """Return trip count for a start time, checking trip_overrides first."""
+def get_trips(shift: dict, range_entry: dict | None, hour: int, minute: int) -> int | None:
+    """Return trip count for a start time, checking range trip_overrides first."""
     start = f"{hour:02d}:{minute:02d}"
-    for override in shift.get("trip_overrides") or []:
+    for override in (range_entry or {}).get("trip_overrides") or []:
         if str(override.get("start_time", "")).strip() == start:
             return int(override["trips"])
     default = shift.get("trips")
@@ -114,21 +110,19 @@ def iter_events(
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
 
+        is_first = not first_shift_seen.get((code, appt_date), False)
+        first_shift_seen[(code, appt_date)] = True
+        raw_ranges = tr.get("date_ranges")
+        date_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
+        range_entry = find_date_range(date_ranges, appt_date) if is_first else None
+        advance = int(range_entry["first_shift_advance"]) if range_entry else advance_minutes
+
+        trips = get_trips(tr, range_entry, hour, minute)
         description = f"Start {hour:02d}:{minute:02d}"
-        trips = get_trips(tr, hour, minute)
         if trips is not None:
             description += f"  |  Ritten: {trips}"
         if tr_description:
             description += f"\n{tr_description}"
-
-        is_first = not first_shift_seen.get((code, appt_date), False)
-        first_shift_seen[(code, appt_date)] = True
-        raw_ranges = tr.get("first_shift_advance")
-        first_shift_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
-        if is_first and first_shift_ranges:
-            advance = get_advance_minutes(appt_date, first_shift_ranges, advance_minutes)
-        else:
-            advance = advance_minutes
 
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
