@@ -15,6 +15,7 @@ import pytest
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
     find_date_range,
+    get_last_shift_remains,
     get_shift_duration_minutes,
     get_trips,
     iter_events,
@@ -242,6 +243,25 @@ def test_duration_falls_back_to_default_when_trips_is_zero():
 
 
 # ---------------------------------------------------------------------------
+# get_last_shift_remains
+# ---------------------------------------------------------------------------
+
+
+def test_last_shift_remains_returns_zero_when_not_set():
+    assert get_last_shift_remains({}, None) == 0
+
+
+def test_last_shift_remains_returns_shift_level_value():
+    assert get_last_shift_remains({"last_shift_remains": 30}, None) == 30
+
+
+def test_last_shift_remains_range_entry_overrides_shift():
+    shift = {"last_shift_remains": 30}
+    range_entry = {"last_shift_remains": 15}
+    assert get_last_shift_remains(shift, range_entry) == 15
+
+
+# ---------------------------------------------------------------------------
 # iter_events — first_shift_advance behaviour
 # ---------------------------------------------------------------------------
 
@@ -334,13 +354,82 @@ def test_unknown_shift_code_gets_default_advance():
     assert advance_of(labels[0]) == 30
 
 
-def test_trip_override_applied_only_on_first_shift():
-    """trip_overrides in range_entry are only available for the first shift."""
+def test_trip_override_applied_to_all_shifts_with_matching_start_time():
+    """range_entry is resolved for every shift, so all shifts at the same time get the override."""
     ws = make_ws(
-        ("03-apr-26", "HRm_", "14:40 uur"),  # first shift, override → 3 trips
-        ("03-apr-26", "HRm_", "14:40 uur"),  # second shift, no range_entry → 2 trips
+        ("03-apr-26", "HRm_", "14:40 uur"),
+        ("03-apr-26", "HRm_", "14:40 uur"),
     )
     events = collect(ws)
     descriptions = [str(event.get("description")) for _, event in events]
     assert "Ritten: 3" in descriptions[0]
-    assert "Ritten: 2" in descriptions[1]
+    assert "Ritten: 3" in descriptions[1]
+
+
+# ---------------------------------------------------------------------------
+# iter_events — last_shift_remains behaviour
+# ---------------------------------------------------------------------------
+
+
+def test_last_shift_of_day_gets_remains_added_to_duration():
+    shift_types = {
+        "HRm_": {
+            "trip_duration": 50,
+            "break_duration": 0,
+            "trips": 1,
+            "last_shift_remains": 30,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRm_", "10:00 uur"))
+    events = list(iter_events(ws, advance_minutes=0, shift_types=shift_types))
+    _, event = events[0]
+    dtstart = event.get("dtstart").dt
+    dtend = event.get("dtend").dt
+    assert (dtend - dtstart).seconds // 60 == 80  # 50 trip + 30 remains
+
+
+def test_only_last_shift_gets_remains():
+    shift_types = {
+        "HRm_": {
+            "trip_duration": 50,
+            "break_duration": 0,
+            "trips": 1,
+            "last_shift_remains": 30,
+        }
+    }
+    ws = make_ws(
+        ("03-apr-26", "HRm_", "10:00 uur"),
+        ("03-apr-26", "HRm_", "14:00 uur"),
+    )
+    events = list(iter_events(ws, advance_minutes=0, shift_types=shift_types))
+    dur_first = (events[0][1].get("dtend").dt - events[0][1].get("dtstart").dt).seconds // 60
+    dur_last = (events[1][1].get("dtend").dt - events[1][1].get("dtstart").dt).seconds // 60
+    assert dur_first == 50  # no remains
+    assert dur_last == 80  # 50 + 30
+
+
+def test_each_day_has_its_own_last_shift():
+    shift_types = {
+        "HRm_": {
+            "trip_duration": 50,
+            "break_duration": 0,
+            "trips": 1,
+            "last_shift_remains": 30,
+        }
+    }
+    ws = make_ws(
+        ("03-apr-26", "HRm_", "10:00 uur"),
+        ("04-apr-26", "HRm_", "10:00 uur"),
+    )
+    events = list(iter_events(ws, advance_minutes=0, shift_types=shift_types))
+    for _, event in events:
+        dur = (event.get("dtend").dt - event.get("dtstart").dt).seconds // 60
+        assert dur == 80  # both are last on their own day
+
+
+def test_last_shift_remains_zero_when_not_configured():
+    shift_types = {"HRm_": {"trip_duration": 50, "break_duration": 0, "trips": 1}}
+    ws = make_ws(("03-apr-26", "HRm_", "10:00 uur"))
+    events = list(iter_events(ws, advance_minutes=0, shift_types=shift_types))
+    dur = (events[0][1].get("dtend").dt - events[0][1].get("dtstart").dt).seconds // 60
+    assert dur == 50

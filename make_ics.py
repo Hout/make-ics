@@ -84,6 +84,12 @@ def get_shift_duration_minutes(
     return int(trips) * int(trip_duration) + max(0, trips - 1) * break_duration
 
 
+def get_last_shift_remains(shift: dict, range_entry: dict | None) -> int:
+    """Return the extra minutes appended to the last shift of the day, or 0."""
+    merged = {**shift, **(range_entry or {})}
+    return int(merged.get("last_shift_remains", 0))
+
+
 def parse_dutch_date(date_str: str) -> date:
     """Parse a Dutch date string like '03-apr-26' using dateparser."""
     parsed = dateparser.parse(date_str.strip(), languages=["nl"])
@@ -128,31 +134,45 @@ def iter_events(
     shift_types: dict[str, dict] | None = None,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
-    first_shift_seen: dict[tuple[str, date], bool] = {}
+    # Pre-collect all parseable rows so we can identify first/last per (code, date).
+    parsed_rows: list[tuple[str, date, int, int]] = []
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
             continue
-
         date_str, dienst_str, time_str = row
         code = str(dienst_str).strip() if dienst_str else "Afspraak"
-        tr = (shift_types or {}).get(code, {})
-        summary = tr.get("summary", code)
-        tr_description = tr.get("description")
-
         try:
             appt_date = parse_dutch_date(str(date_str))
             hour, minute = parse_time(str(time_str))
         except ValueError as exc:
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
+        parsed_rows.append((code, appt_date, hour, minute))
+
+    # Build maps: first and last row index per (code, date).
+    first_idx: dict[tuple[str, date], int] = {}
+    last_idx: dict[tuple[str, date], int] = {}
+    for idx, (code, appt_date, _, _) in enumerate(parsed_rows):
+        key = (code, appt_date)
+        if key not in first_idx:
+            first_idx[key] = idx
+        last_idx[key] = idx
+
+    for idx, (code, appt_date, hour, minute) in enumerate(parsed_rows):
+        key = (code, appt_date)
+        is_first = idx == first_idx[key]
+        is_last = idx == last_idx[key]
+
+        tr = (shift_types or {}).get(code, {})
+        summary = tr.get("summary", code)
+        tr_description = tr.get("description")
 
         start_time = f"{hour:02d}:{minute:02d}"
-        is_first = not first_shift_seen.get((code, appt_date), False)
-        first_shift_seen[(code, appt_date)] = True
         raw_ranges = tr.get("date_ranges")
         date_ranges: list[dict] = raw_ranges if isinstance(raw_ranges, list) else []
-        range_entry = find_date_range(date_ranges, appt_date, start_time) if is_first else None
-        if range_entry and "first_shift_advance" in range_entry:
+        range_entry = find_date_range(date_ranges, appt_date, start_time)
+
+        if is_first and range_entry and "first_shift_advance" in range_entry:
             advance = int(range_entry["first_shift_advance"])
         elif is_first and "first_shift_advance" in tr:
             advance = int(tr["first_shift_advance"])
@@ -163,6 +183,9 @@ def iter_events(
         duration_minutes = get_shift_duration_minutes(
             tr, range_entry, trips, int(duration_hours * 60)
         )
+        if is_last:
+            duration_minutes += get_last_shift_remains(tr, range_entry)
+
         description = f"Start {hour:02d}:{minute:02d}"
         if trips is not None:
             description += f"  |  Ritten: {trips}"
