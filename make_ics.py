@@ -1,12 +1,11 @@
 """
-Reads an xlsx schedule file and generates one ICS file per appointment,
-each named after the appointment date, packaged in a zip file.
+Reads an xlsx schedule file and generates a single ICS calendar file
+containing all appointments.
 """
 
 import argparse
 import re
 import uuid
-import zipfile
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -48,24 +47,22 @@ def is_data_row(row: tuple) -> bool:
     return bool(re.match(r"\d{2}-[a-zA-Z]{3}-\d{2}", date_str))
 
 
-def make_single_event_calendar(name: str, event: Event) -> Calendar:
-    """Wrap a single Event in a minimal Calendar."""
+def make_calendar(name: str) -> Calendar:
+    """Return a new empty Calendar."""
     cal = Calendar()
     cal.add("prodid", f"-//make-ics//{name}//NL")
     cal.add("version", "2.0")
     cal.add("calscale", "GREGORIAN")
     cal.add("method", "PUBLISH")
-    cal.add_component(event)
     return cal
 
 
-def iter_appointment_calendars(
+def iter_events(
     ws,
-    name: str = "calendar",
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
-) -> Iterator[tuple[str, Calendar]]:
-    """Yield (ics_filename, Calendar) for each appointment row in the worksheet."""
+) -> Iterator[tuple[str, Event]]:
+    """Yield (label, Event) for each appointment row in the worksheet."""
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
             continue
@@ -93,9 +90,8 @@ def iter_appointment_calendars(
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        ics_filename = f"{appt_date}.ics"
-        yield ics_filename, make_single_event_calendar(name, event)
-        print(f"  + {appt_date} {hour:02d}:{minute:02d}  (-{advance_minutes}min)  →  {dienst}")
+        label = f"{appt_date} {hour:02d}:{minute:02d}"
+        yield label, event
 
 
 def main():
@@ -138,17 +134,17 @@ def main():
     ws = wb.active
     print(f"Sheet: {ws.title}\n")
 
-    zip_path = input_path.with_suffix(".zip")
+    zip_path = input_path.with_suffix(".ics")
+    cal = make_calendar(input_path.stem)
     count = 0
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for ics_name, cal in iter_appointment_calendars(
-            ws, name=input_path.stem, duration_hours=args.duration, advance_minutes=args.advance
-        ):
-            zf.writestr(ics_name, cal.to_ical())
-            count += 1
+    for label, event in iter_events(ws, duration_hours=args.duration, advance_minutes=args.advance):
+        cal.add_component(event)
+        count += 1
+        print(f"  + {label}  (-{args.advance}min)")
 
+    zip_path.write_bytes(cal.to_ical())
     print(f"\nTotal events written: {count}")
-    print(f"Written into {zip_path.resolve()}")
+    print(f"Written to {zip_path.resolve()}")
 
 
 if __name__ == "__main__":
