@@ -302,5 +302,5 @@ def main():
     print(f"Written to {ics_path.resolve()}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

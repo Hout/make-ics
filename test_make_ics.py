@@ -8,6 +8,7 @@ advance_minutes.
 
 import re
 from datetime import date
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,10 +17,17 @@ from icalendar import Event
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
     find_date_range,
+    get_duration_rationale,
     get_last_shift_remains,
     get_shift_duration_minutes,
     get_trips,
+    is_data_row,
     iter_events,
+    load_config,
+    main,
+    make_calendar,
+    parse_dutch_date,
+    parse_time,
 )
 
 # ---------------------------------------------------------------------------
@@ -434,3 +442,206 @@ def test_last_shift_remains_zero_when_not_configured():
     events = list(iter_events(ws, advance_minutes=0, shift_types=shift_types))
     dur = (events[0][1].get("dtend").dt - events[0][1].get("dtstart").dt).seconds // 60
     assert dur == 50
+
+
+# ---------------------------------------------------------------------------
+# load_config
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_returns_empty_dict_when_file_missing(monkeypatch, tmp_path):
+    import make_ics
+
+    monkeypatch.setattr(make_ics, "TRANSLATIONS_FILE", tmp_path / "nonexistent.yaml")
+    assert load_config() == {}
+
+
+def test_load_config_returns_empty_dict_when_file_is_empty(monkeypatch, tmp_path):
+    import make_ics
+
+    empty = tmp_path / "config.yaml"
+    empty.write_text("")
+    monkeypatch.setattr(make_ics, "TRANSLATIONS_FILE", empty)
+    assert load_config() == {}
+
+
+# ---------------------------------------------------------------------------
+# get_duration_rationale
+# ---------------------------------------------------------------------------
+
+
+def test_duration_rationale_default_when_no_trips():
+    assert get_duration_rationale({}, None, None, 240) == "240min (default)"
+
+
+def test_duration_rationale_default_when_trips_but_no_trip_duration():
+    assert get_duration_rationale({"trips": 2}, None, 2, 240) == "240min (default)"
+
+
+def test_duration_rationale_single_trip_no_breaks():
+    shift = {"trip_duration": 50, "break_duration": 15}
+    assert get_duration_rationale(shift, None, 1, 240) == "1x50=50min"
+
+
+def test_duration_rationale_multiple_trips_with_breaks():
+    shift = {"trip_duration": 50, "break_duration": 15}
+    assert get_duration_rationale(shift, None, 2, 240) == "2x50+1x15=115min"
+
+
+def test_duration_rationale_with_last_shift_remains():
+    shift = {"trip_duration": 50, "break_duration": 15}
+    assert get_duration_rationale(shift, None, 2, 240, 30) == "2x50+1x15=115min+30min"
+
+
+def test_duration_rationale_no_break_duration_field():
+    shift = {"trip_duration": 60}
+    # break_duration defaults to 0, n_breaks=1 but 0-valued so branch not printed
+    assert get_duration_rationale(shift, None, 2, 240) == "2x60+1x0=120min"
+
+
+# ---------------------------------------------------------------------------
+# parse_dutch_date
+# ---------------------------------------------------------------------------
+
+
+def test_parse_dutch_date_valid():
+    assert parse_dutch_date("03-apr-26") == date(2026, 4, 3)
+
+
+def test_parse_dutch_date_raises_on_unparseable():
+    with pytest.raises(ValueError, match="Could not parse date"):
+        parse_dutch_date("not-a-date")
+
+
+# ---------------------------------------------------------------------------
+# parse_time
+# ---------------------------------------------------------------------------
+
+
+def test_parse_time_valid():
+    assert parse_time("14:40 uur") == (14, 40)
+
+
+def test_parse_time_raises_on_invalid_format():
+    with pytest.raises(ValueError, match="Unexpected time format"):
+        parse_time("geen tijd")
+
+
+# ---------------------------------------------------------------------------
+# is_data_row
+# ---------------------------------------------------------------------------
+
+
+def test_is_data_row_valid():
+    assert is_data_row(("03-apr-26", "HRm_", "14:40 uur")) is True
+
+
+def test_is_data_row_false_when_no_date():
+    assert is_data_row((None, "HRm_", "14:40 uur")) is False
+
+
+def test_is_data_row_false_when_no_time():
+    assert is_data_row(("03-apr-26", "HRm_", None)) is False
+
+
+def test_is_data_row_false_when_date_pattern_mismatch():
+    assert is_data_row(("Datum", "Dienst", "Tijd")) is False
+
+
+# ---------------------------------------------------------------------------
+# make_calendar
+# ---------------------------------------------------------------------------
+
+
+def test_make_calendar_returns_calendar_with_correct_version():
+    cal = make_calendar("test")
+    assert cal.get("version").to_ical() == b"2.0"
+
+
+def test_make_calendar_includes_name_in_prodid():
+    cal = make_calendar("myfile")
+    assert b"myfile" in cal.get("prodid").to_ical()
+
+
+# ---------------------------------------------------------------------------
+# iter_events — additional branches
+# ---------------------------------------------------------------------------
+
+
+def test_iter_events_skips_non_data_rows():
+    """Header rows (da pattern mismatch) must be silently skipped."""
+    ws = make_ws(
+        ("Datum", "Dienst", "Tijd"),  # header - not a data row
+        ("03-apr-26", "HRm_", "14:40 uur"),
+    )
+    events = collect(ws)
+    assert len(events) == 1
+
+
+def test_iter_events_skips_row_with_unparseable_time(capsys):
+    """A row that passes is_data_row but has bad time is skipped with a SKIP message."""
+    ws = make_ws(("03-apr-26", "HRm_", "geen-tijd"))
+    events = collect(ws)
+    assert events == []
+    captured = capsys.readouterr()
+    assert "[SKIP]" in captured.out
+
+
+def test_iter_events_uses_afspraak_when_code_is_none():
+    """When dienst column is None the code falls back to 'Afspraak'."""
+    ws = make_ws(("03-apr-26", None, "14:40 uur"))
+    events = list(iter_events(ws, shift_types={}))
+    assert len(events) == 1
+    label, _ = events[0]
+    assert "Afspraak" in label
+
+
+def test_iter_events_appends_description_when_shift_has_description():
+    """tr_description is appended to event description on a new line."""
+    shift_types = {
+        "HRm_": {
+            "summary": "Test",
+            "description": "Some route detail",
+            "trips": 1,
+            "trip_duration": 50,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRm_", "14:40 uur"))
+    events = list(iter_events(ws, shift_types=shift_types))
+    _, event = events[0]
+    assert "Some route detail" in str(event.get("description"))
+
+
+# ---------------------------------------------------------------------------
+# main()
+# ---------------------------------------------------------------------------
+
+REPORT = Path(__file__).parent / "report.xlsx"
+
+
+def test_main_raises_on_missing_input_file(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["make_ics.py", "no_such_file.xlsx"])
+    with pytest.raises(FileNotFoundError, match="not found"):
+        main()
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="report.xlsx not present")
+def test_main_runs_successfully_on_real_report(monkeypatch, tmp_path):
+    import shutil
+
+    xlsx = tmp_path / "report.xlsx"
+    shutil.copy(REPORT, xlsx)
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx)])
+    main()
+    assert (tmp_path / "report.ics").exists()
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="report.xlsx not present")
+def test_main_accepts_custom_duration_and_advance(monkeypatch, tmp_path):
+    import shutil
+
+    xlsx = tmp_path / "report.xlsx"
+    shutil.copy(REPORT, xlsx)
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-d", "2", "-a", "15"])
+    main()
+    assert (tmp_path / "report.ics").exists()
