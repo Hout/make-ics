@@ -17,6 +17,17 @@ type ResolvedRange struct {
     LastRemains   *int
 }
 
+// resolvedFromEntry builds a ResolvedRange populated from the entry-level fields.
+func resolvedFromEntry(entry model.DateRange) ResolvedRange {
+    return ResolvedRange{
+        Trips:         entry.Trips,
+        TripDuration:  entry.TripDuration,
+        BreakDuration: entry.BreakDuration,
+        FirstAdvance:  entry.FirstAdvance,
+        LastRemains:   entry.LastRemains,
+    }
+}
+
 // FindDateRange finds the first date range covering apptDate. If a start_time
 // matches a group's Times, the group's fields override the entry-level fields.
 // Returns nil when no range matches.
@@ -36,14 +47,7 @@ func FindDateRange(dateRanges []model.DateRange, apptDate time.Time, startTime s
             for _, g := range entry.StartTimes {
                 for _, tm := range g.Times {
                     if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
-                        // build merged result: group overrides entry
-                        rr := ResolvedRange{
-                            Trips:         entry.Trips,
-                            TripDuration:  entry.TripDuration,
-                            BreakDuration: entry.BreakDuration,
-                            FirstAdvance:  entry.FirstAdvance,
-                            LastRemains:   entry.LastRemains,
-                        }
+                        rr := resolvedFromEntry(entry)
                         if g.Trips != nil { rr.Trips = g.Trips }
                         if g.TripDuration != nil { rr.TripDuration = g.TripDuration }
                         if g.BreakDuration != nil { rr.BreakDuration = g.BreakDuration }
@@ -54,14 +58,7 @@ func FindDateRange(dateRanges []model.DateRange, apptDate time.Time, startTime s
                 }
             }
         }
-        // no matching group — return entry-level fields
-        rr := ResolvedRange{
-            Trips:         entry.Trips,
-            TripDuration:  entry.TripDuration,
-            BreakDuration: entry.BreakDuration,
-            FirstAdvance:  entry.FirstAdvance,
-            LastRemains:   entry.LastRemains,
-        }
+        rr := resolvedFromEntry(entry)
         return &rr
     }
     return nil

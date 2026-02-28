@@ -9,9 +9,9 @@ import (
 	"golang.org/x/text/language"
 )
 
+// Localizer wraps go-i18n v2 and exposes simplified T/N accessors.
 type Localizer struct {
-	bundle *goweb_i18n.Bundle
-	loc    *goweb_i18n.Localizer
+	loc *goweb_i18n.Localizer
 }
 
 // NewLocalizer loads message files from the provided localesDir and returns a Localizer for the given locale.
@@ -30,15 +30,17 @@ func NewLocalizer(localesDir, locale string) (*Localizer, error) {
 		}
 	}
 	loc := goweb_i18n.NewLocalizer(bundle, locale)
-	return &Localizer{bundle: bundle, loc: loc}, nil
+	return &Localizer{loc: loc}, nil
 }
 
-func (l *Localizer) T(id string, templateData map[string]interface{}) string {
+// T returns the localised string for the given message ID, with optional template data.
+func (l *Localizer) T(id string, templateData map[string]any) string {
 	msg, _ := l.loc.Localize(&goweb_i18n.LocalizeConfig{MessageID: id, TemplateData: templateData})
 	return msg
 }
 
-func (l *Localizer) N(id string, pluralCount int, templateData map[string]interface{}) string {
+// N returns the localised plural string for the given message ID and count.
+func (l *Localizer) N(id string, pluralCount int, templateData map[string]any) string {
 	msg, _ := l.loc.Localize(&goweb_i18n.LocalizeConfig{MessageID: id, PluralCount: &pluralCount, TemplateData: templateData})
 	return msg
 }

@@ -12,6 +12,23 @@ var (
 	dutchDateRE = regexp.MustCompile(`(?i)^(\d{2})-([A-Za-z]{3})-(\d{2})$`)
 	timeRE      = regexp.MustCompile(`^(\d{1,2}):(\d{2})`)
 	dataRowRE   = regexp.MustCompile(`^\d{2}-[A-Za-z]{3}-\d{2}$`)
+
+	monthMap = map[string]time.Month{
+		"jan": time.January,
+		"feb": time.February,
+		"mrt": time.March,
+		"mar": time.March,
+		"apr": time.April,
+		"mei": time.May,
+		"jun": time.June,
+		"jul": time.July,
+		"aug": time.August,
+		"sep": time.September,
+		"okt": time.October,
+		"oct": time.October,
+		"nov": time.November,
+		"dec": time.December,
+	}
 )
 
 // ParseDutchDate parses a strict Dutch date in format DD-MMM-YY (e.g. 03-apr-26)
@@ -27,22 +44,6 @@ func ParseDutchDate(s string) (time.Time, error) {
 	day, err := strconv.Atoi(dayStr)
 	if err != nil {
 		return time.Time{}, err
-	}
-	monthMap := map[string]time.Month{
-		"jan": time.January,
-		"feb": time.February,
-		"mrt": time.March,
-		"mar": time.March,
-		"apr": time.April,
-		"mei": time.May,
-		"jun": time.June,
-		"jul": time.July,
-		"aug": time.August,
-		"sep": time.September,
-		"okt": time.October,
-		"oct": time.October,
-		"nov": time.November,
-		"dec": time.December,
 	}
 	mon, ok := monthMap[monStr]
 	if !ok {

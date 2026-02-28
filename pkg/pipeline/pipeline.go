@@ -15,8 +15,8 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/schedule"
 )
 
+// Event holds all fields needed to write a single VEVENT to an ICS calendar.
 type Event struct {
-	Label       string
 	Summary     string
 	Description string
 	DtStart     time.Time
@@ -82,9 +82,8 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 	if err != nil {
 		return nil, err
 	}
+	const defaultAppointmentMinutes = 240 // 4 h fallback when no trip data is configured
 	var events []Event
-	// default appointment duration is fixed at 240 minutes (4 hours)
-	defaultMinutes := 240
 	for i, p := range parsed {
 		key := fmt.Sprintf("%s|%s", p.Code, p.Date.Format("2006-01-02"))
 		isFirst := firstIdx[key] == i
@@ -111,7 +110,7 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		}
 
 		trips := schedule.GetTrips(shift, rangeEntry)
-		durationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultMinutes)
+		durationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultAppointmentMinutes)
 		remains := 0
 		if isLast {
 			remains = schedule.GetLastShiftRemains(shift, rangeEntry)
@@ -142,13 +141,13 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 			} else {
 				description += fmt.Sprintf("%02d:%02d ", p.Hour, p.Min)
 				description += loc.T("Start", nil)
-				description += "\n" + loc.T("- {n}m in advance", map[string]interface{}{"n": advance})
+				description += "\n" + loc.T("- {n}m in advance", map[string]any{"n": advance})
 				description += fmt.Sprintf("\n%d %s", *trips, loc.N("trip", *trips, nil))
 			}
 		} else {
 			description += fmt.Sprintf("%02d:%02d ", p.Hour, p.Min)
 			description += loc.T("Start", nil)
-			description += "\n" + loc.T("- {n}m in advance", map[string]interface{}{"n": advance})
+			description += "\n" + loc.T("- {n}m in advance", map[string]any{"n": advance})
 		}
 
 		dtAppt := time.Date(p.Date.Year(), p.Date.Month(), p.Date.Day(), p.Hour, p.Min, 0, 0, locTZ)
@@ -156,7 +155,6 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		dtEnd := dtAppt.Add(time.Duration(durationMinutes) * time.Minute)
 
 		ev := Event{
-			Label:       fmt.Sprintf("%s %02d:%02d  %s", p.Date.Format("2006-01-02"), p.Hour, p.Min, p.Code),
 			Summary:     p.Code,
 			Description: description,
 			DtStart:     dtStart,

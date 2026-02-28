@@ -9,12 +9,14 @@ import (
 	dr "github.com/jeroen/make-ics-go/pkg/range"
 )
 
-// Translator is a minimal interface for localized strings used by schedule helpers.
+// Translator is a minimal interface for localised strings used by schedule helpers.
 type Translator interface {
-	T(id string, data map[string]interface{}) string
-	N(id string, count int, data map[string]interface{}) string
+	T(id string, data map[string]any) string
+	N(id string, count int, data map[string]any) string
 }
 
+// GetTrips returns the effective trip count, with rangeEntry taking precedence
+// over the shift-level setting. Returns nil when no count is configured.
 func GetTrips(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
 	if rangeEntry != nil && rangeEntry.Trips != nil {
 		return rangeEntry.Trips
@@ -25,6 +27,9 @@ func GetTrips(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
 	return nil
 }
 
+// GetShiftDurationMinutes returns the total shift duration in minutes using the
+// formula trips×tripDuration + max(0,trips−1)×breakDuration. Falls back to
+// defaultMinutes when trips or tripDuration are not configured.
 func GetShiftDurationMinutes(shift model.ShiftType, rangeEntry *dr.ResolvedRange, trips *int, defaultMinutes int) int {
 	if trips == nil || *trips == 0 {
 		return defaultMinutes
@@ -54,6 +59,8 @@ func GetShiftDurationMinutes(shift model.ShiftType, rangeEntry *dr.ResolvedRange
 	return n*td + max(0, n-1)*bd
 }
 
+// GetLastShiftRemains returns the extra minutes appended to the last shift of
+// a (code, date) group, with rangeEntry taking precedence over the shift setting.
 func GetLastShiftRemains(shift model.ShiftType, rangeEntry *dr.ResolvedRange) int {
 	if rangeEntry != nil && rangeEntry.LastRemains != nil {
 		return *rangeEntry.LastRemains
@@ -64,6 +71,8 @@ func GetLastShiftRemains(shift model.ShiftType, rangeEntry *dr.ResolvedRange) in
 	return 0
 }
 
+// GetDurationRationale returns a human-readable breakdown of how the shift
+// duration is computed, e.g. "3x40+2x10=140min+15min".
 func GetDurationRationale(shift model.ShiftType, rangeEntry *dr.ResolvedRange, trips *int, defaultMinutes int, lastShiftRemains int) string {
 	if trips != nil && *trips > 0 {
 		var tripDuration *int
@@ -101,24 +110,24 @@ func GetDurationRationale(shift model.ShiftType, rangeEntry *dr.ResolvedRange, t
 	return fmt.Sprintf("%dmin (default)", defaultMinutes)
 }
 
-func BuildTripTimes(hour int, minute int, trips int, tripDuration int, breakDuration int) []struct{ Start, End string } {
-	var out []struct{ Start, End string }
-	offset := 0
-	for i := 0; i < trips; i++ {
-		startH := hour
-		startM := minute + offset
-		// normalize minutes into hour/min
-		sh := startH + (startM / 60)
-		sm := startM % 60
-		endMTotal := startM + tripDuration
-		eh := hour + (endMTotal / 60)
-		em := endMTotal % 60
-		out = append(out, struct{ Start, End string }{fmt.Sprintf("%02d:%02d", sh, sm), fmt.Sprintf("%02d:%02d", eh, em)})
-		offset += tripDuration + breakDuration
+// BuildTripTimes returns a slice of (Start, End) time strings for each trip,
+// computed using time.Time arithmetic to avoid modular int math.
+func BuildTripTimes(hour, minute, trips, tripDuration, breakDuration int) []struct{ Start, End string } {
+	out := make([]struct{ Start, End string }, 0, trips)
+	cur := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
+	for range trips {
+		end := cur.Add(time.Duration(tripDuration) * time.Minute)
+		out = append(out, struct{ Start, End string }{
+			Start: fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()),
+			End:   fmt.Sprintf("%02d:%02d", end.Hour(), end.Minute()),
+		})
+		cur = end.Add(time.Duration(breakDuration) * time.Minute)
 	}
 	return out
 }
 
+// FormatTripSchedule formats a list of (Start, End) trip segments into a
+// single human-readable line, e.g. "3 trips: 10:00-11:00, 11:10-12:10 and 12:20-13:20".
 func FormatTripSchedule(tripTimes []struct{ Start, End string }, t Translator) string {
 	n := len(tripTimes)
 	segments := make([]string, n)
@@ -153,14 +162,14 @@ func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int
 	for i := 1; i <= trips; i++ {
 		tripLabel := fmt.Sprintf("Trip %d", i)
 		if t != nil {
-			tripLabel = t.T("Trip", map[string]interface{}{"n": i})
+			tripLabel = t.T("Trip", map[string]any{"n": i})
 		}
 		lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), tripLabel))
 		end := cur.Add(time.Duration(tripDuration) * time.Minute)
 		if i < trips {
 			breakLabel := fmt.Sprintf("Break %d", i)
 			if t != nil {
-				breakLabel = t.T("Break", map[string]interface{}{"n": i})
+				breakLabel = t.T("Break", map[string]any{"n": i})
 			}
 			lines = append(lines, fmt.Sprintf("%02d:%02d %s", end.Hour(), end.Minute(), breakLabel))
 			cur = end.Add(time.Duration(breakDuration) * time.Minute)
@@ -172,7 +181,7 @@ func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int
 		afterEnd := cur.Add(time.Duration(remains) * time.Minute)
 		afterMsg := fmt.Sprintf("aftercare \u2192 %02d:%02d", afterEnd.Hour(), afterEnd.Minute())
 		if t != nil {
-			afterMsg = t.T("aftercare", map[string]interface{}{"time": fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())})
+			afterMsg = t.T("aftercare", map[string]any{"time": fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())})
 		}
 		lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), afterMsg))
 	}

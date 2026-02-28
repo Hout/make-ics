@@ -11,6 +11,8 @@ import (
     "github.com/jeroen/make-ics-go/pkg/model"
 )
 
+// LoadConfig reads and unmarshals the YAML file at path into a Config.
+// A missing file is not an error — it returns a zero-value Config.
 func LoadConfig(path string) (model.Config, error) {
     var cfg model.Config
     f, err := os.Open(path)
@@ -34,12 +36,14 @@ func LoadConfig(path string) (model.Config, error) {
     return cfg, nil
 }
 
+// ValidateConfig checks that the required fields are present and that the
+// timezone is a valid IANA location name.
 func ValidateConfig(cfg model.Config, path string) error {
     if cfg.Timezone == "" || cfg.Locale == "" || len(cfg.ShiftType) == 0 {
-        return fmt.Errorf("Config file '%s' is missing required keys: timezone, locale, or shift_type", path)
+        return fmt.Errorf("config file %q is missing required keys: timezone, locale, or shift_type", path)
     }
     if _, err := time.LoadLocation(cfg.Timezone); err != nil {
-        return fmt.Errorf("Config file '%s' has invalid timezone: %q", path, cfg.Timezone)
+        return fmt.Errorf("config file %q has invalid timezone: %q", path, cfg.Timezone)
     }
     return nil
 }

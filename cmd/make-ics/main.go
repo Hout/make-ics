@@ -49,7 +49,7 @@ func Run(args []string, localesDir ...string) error {
 	// load config
 	cfg, err := config.LoadConfig(*cfgPath)
 	if err != nil {
-		return fmt.Errorf("Failed to load config: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 	if err := config.ValidateConfig(cfg, *cfgPath); err != nil {
 		return err
@@ -58,28 +58,28 @@ func Run(args []string, localesDir ...string) error {
 	// i18n
 	loc, err := i18n.NewLocalizer(dir, cfg.Locale)
 	if err != nil {
-		return fmt.Errorf("Failed to initialize i18n: %w", err)
+		return fmt.Errorf("failed to initialize i18n: %w", err)
 	}
 
-	fmt.Println(loc.T("Reading {path} …", map[string]interface{}{"path": *input}))
+	fmt.Println(loc.T("Reading {path} …", map[string]any{"path": *input}))
 
 	wb, err := excelize.OpenFile(*input)
 	if err != nil {
-		return fmt.Errorf("Failed to open workbook: %w", err)
+		return fmt.Errorf("failed to open workbook: %w", err)
 	}
 	defer wb.Close()
 
 	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, loc)
 	if err != nil {
-		return fmt.Errorf("Failed to build events: %w", err)
+		return fmt.Errorf("failed to build events: %w", err)
 	}
 
 	icsPath := (*input)[:len(*input)-len(filepath.Ext(*input))] + ".ics"
 	if err := ics.WriteCalendar(filepath.Base(*input), events, icsPath); err != nil {
-		return fmt.Errorf("Failed to write ICS: %w", err)
+		return fmt.Errorf("failed to write ICS: %w", err)
 	}
 
-	fmt.Println(loc.T("Total events written: {count}", map[string]interface{}{"count": len(events)}))
-	fmt.Println(loc.T("Written to {path}", map[string]interface{}{"path": icsPath}))
+	fmt.Println(loc.T("Total events written: {count}", map[string]any{"count": len(events)}))
+	fmt.Println(loc.T("Written to {path}", map[string]any{"path": icsPath}))
 	return nil
 }

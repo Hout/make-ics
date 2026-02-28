@@ -7,7 +7,9 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/pipeline"
 )
 
-func WriteCalendar(name string, events []pipeline.Event, path string) error {
+// WriteCalendar serialises events to an ICS file at path, setting name as the
+// calendar display name (X-WR-CALNAME). Write and close errors are both returned.
+func WriteCalendar(name string, events []pipeline.Event, path string) (err error) {
 	cal := ical.NewCalendar()
 	cal.SetMethod(ical.MethodPublish)
 	cal.SetProductId("-//make-ics//go//NL")
@@ -21,9 +23,13 @@ func WriteCalendar(name string, events []pipeline.Event, path string) error {
 	}
 	f, err := os.Create(path)
 	if err != nil {
-		return err
+		return
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 	_, err = f.WriteString(cal.Serialize())
-	return err
+	return
 }

@@ -1,7 +1,10 @@
 package model
 
-
 import "time"
+
+// StartTimeGroup is an optional override within a DateRange that narrows
+// scheduling parameters to specific departure times.
+type placeholder_remove_me = struct{}
 
 type StartTimeGroup struct {
     Times         []string               `yaml:"times,omitempty"`
@@ -12,6 +15,8 @@ type StartTimeGroup struct {
     LastRemains   *int                   `yaml:"last_shift_remains,omitempty"`
 }
 
+// DateRange defines a calendar window [From, To] with optional per-window
+// overrides for trips, durations, advance, and last-shift extension.
 type DateRange struct {
     From          time.Time            `yaml:"from"`
     To            time.Time            `yaml:"to"`
@@ -23,6 +28,7 @@ type DateRange struct {
     LastRemains   *int                 `yaml:"last_shift_remains,omitempty"`
 }
 
+// ShiftType holds the scheduling parameters for a named shift code.
 type ShiftType struct {
     Summary         string       `yaml:"summary,omitempty"`
     Description     string       `yaml:"description,omitempty"`
@@ -34,6 +40,7 @@ type ShiftType struct {
     DateRanges      []DateRange  `yaml:"date_ranges,omitempty"`
 }
 
+// Config is the top-level structure of config.yaml.
 type Config struct {
     Timezone  string                 `yaml:"timezone"`
     Locale    string                 `yaml:"locale"`
