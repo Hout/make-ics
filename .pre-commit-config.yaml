@@ -1,6 +1,7 @@
 repos:
   - repo: local
     hooks:
+      # ── Python ────────────────────────────────────────────────────────────
       - id: ruff-format
         name: ruff format
         entry: .venv/bin/ruff format
@@ -22,9 +23,31 @@ repos:
         types: [python]
         pass_filenames: false
 
-      - id: coverage
+      - id: pytest
         name: pytest (with coverage)
         entry: .venv/bin/pytest --cov=make_ics --cov-fail-under=90
         language: system
-        always_run: true
+        types: [python]
+        pass_filenames: false
+
+      # ── Go ────────────────────────────────────────────────────────────────
+      - id: go-build
+        name: go build
+        entry: go build ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-vet
+        name: go vet
+        entry: go vet ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-test
+        name: go test
+        entry: go test ./...
+        language: system
+        types: [go]
         pass_filenames: false
