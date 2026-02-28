@@ -811,19 +811,19 @@ def test_setup_locale_en_GB_returns_source_strings():
 
 def test_format_trip_schedule_nl_NL_single_trip():
     t = setup_locale("nl_NL")
-    assert format_trip_schedule([("10:00", "10:50")], t) == "1 rit: 10:00-10:50"
+    assert format_trip_schedule([("10:00", "10:50")], t) == "1 tocht: 10:00-10:50"
 
 
 def test_format_trip_schedule_nl_NL_two_trips():
     t = setup_locale("nl_NL")
     result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10")], t)
-    assert result == "2 ritten: 10:00-10:50 en 11:20-12:10"
+    assert result == "2 tochten: 10:00-10:50 en 11:20-12:10"
 
 
 def test_format_trip_schedule_nl_NL_three_trips():
     t = setup_locale("nl_NL")
     result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10"), ("12:40", "13:30")], t)
-    assert result == "3 ritten: 10:00-10:50, 11:20-12:10 en 12:40-13:30"
+    assert result == "3 tochten: 10:00-10:50, 11:20-12:10 en 12:40-13:30"
 
 
 def test_format_trip_schedule_en_GB_unchanged():
@@ -866,7 +866,7 @@ def test_iter_events_description_nl_NL_trip_schedule():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "3 ritten: 10:00-10:50, 11:20-12:10 en 12:40-13:30" in desc
+    assert "3 tochten: 10:00-10:50, 11:20-12:10 en 12:40-13:30" in desc
 
 
 def test_iter_events_description_nl_NL_singular_minuut():

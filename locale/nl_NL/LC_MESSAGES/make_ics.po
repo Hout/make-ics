@@ -10,8 +10,8 @@ msgstr "en"
 
 msgid "trip"
 msgid_plural "trips"
-msgstr[0] "rit"
-msgstr[1] "ritten"
+msgstr[0] "tocht"
+msgstr[1] "tochten"
 
 msgid "Start {start}, arrive {n} minute early."
 msgid_plural "Start {start}, arrive {n} minutes early."
