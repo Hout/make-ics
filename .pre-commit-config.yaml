@@ -26,5 +26,5 @@ repos:
         name: pytest
         entry: .venv/bin/pytest
         language: system
-        types: [python]
+        always_run: true
         pass_filenames: false
