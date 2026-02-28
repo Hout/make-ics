@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import dateparser
 import openpyxl
@@ -20,6 +21,7 @@ from icalendar import Calendar, Event
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
 DEFAULT_LOCALE = "nl_NL"
+DEFAULT_TIMEZONE = "Europe/Amsterdam"
 TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
 LOCALE_DIR = Path(__file__).parent / "locale"
 
@@ -261,9 +263,11 @@ def iter_events(
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
     shift_types: dict[str, dict] | None = None,
     locale: str = DEFAULT_LOCALE,
+    timezone: str = DEFAULT_TIMEZONE,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
     t = setup_locale(locale)
+    tz = ZoneInfo(timezone)
     parsed_rows = _collect_rows(ws)
 
     # Build maps: first and last row index per (code, date).
@@ -328,8 +332,13 @@ def iter_events(
             description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
 
         dt_appt = datetime(
-            appt_date.year, appt_date.month, appt_date.day, hour, minute
-        ).astimezone()
+            appt_date.year,
+            appt_date.month,
+            appt_date.day,
+            hour,
+            minute,
+            tzinfo=tz,
+        )
         dt_start = dt_appt - timedelta(minutes=advance)
         dt_end = dt_appt + timedelta(minutes=duration_minutes)
 
@@ -395,6 +404,7 @@ def main():
     ics_path = input_path.with_suffix(".ics")
     config = load_config()
     shift_types = config.get("shift_type") or {}
+    timezone = config.get("timezone", DEFAULT_TIMEZONE)
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
@@ -403,6 +413,7 @@ def main():
         advance_minutes=args.advance,
         shift_types=shift_types,
         locale=args.locale,
+        timezone=timezone,
     ):
         cal.add_component(event)
         count += 1

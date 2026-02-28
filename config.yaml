@@ -1,4 +1,5 @@
 # Shift type definitions for appointment abbreviations used in the xlsx schedule.
+timezone: Europe/Amsterdam
 shift_type:
   HRm_:
     summary: "Binnendieze HRM"
