@@ -749,7 +749,9 @@ def test_iter_events_description_includes_trip_schedule():
     _, event = events[0]
     desc = str(event.get("description"))
     assert "Start 10:00" in desc
-    assert "arrive 30 minutes early" in desc
+    assert "- 30m in advance" in desc
+    assert "- 3x50m for trips" in desc
+    assert "- 2x30m for breaks" in desc
     assert "3 trips: 10:00-10:50, 11:20-12:10 and 12:40-13:30" in desc
 
 
@@ -784,7 +786,7 @@ def test_iter_events_description_arrive_singular():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "arrive 1 minute early" in desc
+    assert "- 1m in advance" in desc
 
 
 # ---------------------------------------------------------------------------
@@ -844,7 +846,7 @@ def test_iter_events_description_nl_NL_arrive():
     _, event = events[0]
     desc = str(event.get("description"))
     assert "Start 10:00" in desc
-    assert "30 minuten" in desc
+    assert "- 30m van tevoren" in desc
     assert "arrive" not in desc
 
 
@@ -880,8 +882,7 @@ def test_iter_events_description_nl_NL_singular_minuut():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "1 minuut" in desc
-    assert "minuten" not in desc
+    assert "- 1m van tevoren" in desc
 
 
 # ---------------------------------------------------------------------------
@@ -909,7 +910,9 @@ def test_description_appends_remains_after_trip_schedule():
     _, event = events[0]
     desc = str(event.get("description"))
     # last trip ends 14:00 + 3x50 + 2x30 = 14:00 + 210min = 17:30; +30min → 18:00
-    assert "+ 30 min → 18:00" in desc
+    assert "- 30m afterwards → 18:00" in desc
+    assert "- 3x50m for trips" in desc
+    assert "- 2x30m for breaks" in desc
 
 
 def test_description_no_remains_suffix_when_zero():
@@ -956,4 +959,4 @@ def test_description_no_remains_suffix_on_non_last_shift():
     desc_first = str(events[0][1].get("description"))
     desc_last = str(events[1][1].get("description"))
     assert "→" not in desc_first
-    assert "+ 30 min → 15:20" in desc_last
+    assert "- 30m afterwards → 15:20" in desc_last

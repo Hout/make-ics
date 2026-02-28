@@ -275,25 +275,30 @@ def iter_events(
         duration_minutes += remains
 
         description = f"{tr_description}\n" if tr_description else ""
-        description += t.ngettext(
-            "Start {start}, arrive {n} minute early.",
-            "Start {start}, arrive {n} minutes early.",
-            advance,
-        ).format(start=f"{hour:02d}:{minute:02d}", n=advance)
+        description += f"Start {hour:02d}:{minute:02d}"
+        description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
         if trips is not None:
             merged = {**tr, **(range_entry or {})}
             trip_duration = merged.get("trip_duration")
             if trip_duration is not None:
+                trip_duration = int(trip_duration)
                 break_duration = int(merged.get("break_duration", 0))
-                trip_times = build_trip_times(
-                    hour, minute, trips, int(trip_duration), break_duration
+                n_breaks = max(0, trips - 1)
+                trip_times = build_trip_times(hour, minute, trips, trip_duration, break_duration)
+                description += "\n" + t.gettext("- {trips}x{dur}m for trips").format(
+                    trips=trips, dur=trip_duration
                 )
-                schedule = format_trip_schedule(trip_times, t)
+                if n_breaks > 0 and break_duration > 0:
+                    description += "\n" + t.gettext("- {n}x{dur}m for breaks").format(
+                        n=n_breaks, dur=break_duration
+                    )
                 if remains:
                     last_end_dt = datetime.strptime(trip_times[-1][1], "%H:%M")
                     actual_end = (last_end_dt + timedelta(minutes=remains)).strftime("%H:%M")
-                    schedule += f" + {remains} min → {actual_end}"
-                description += f"\n{schedule}"
+                    description += "\n" + t.gettext("- {n}m afterwards → {time}").format(
+                        n=remains, time=actual_end
+                    )
+                description += "\n" + format_trip_schedule(trip_times, t)
             else:
                 trip_word = t.ngettext("trip", "trips", trips)
                 description += f"\n{trips} {trip_word}"
