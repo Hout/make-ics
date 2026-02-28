@@ -46,7 +46,7 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 - `icalendar` — build ICS
 - `dateparser` — parse Dutch date strings (e.g. `03-apr-26`)
 - `pyyaml` — load config
-- Dev: `pytest`, `ruff`, `ty`
+- Dev: `pytest`, `ruff`, `ty`, `pre-commit`
 
 ## Shell / Terminal
 
@@ -56,7 +56,11 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 
 ## Pre-commit Hook
 
-`.git/hooks/pre-commit` runs automatically:
+Managed by the [pre-commit](https://pre-commit.com) package. Config lives in `.pre-commit-config.yaml`; hooks are installed into `.git/hooks/pre-commit` via `pre-commit install`.
+
+Hooks (all `local`, pointing to `.venv/bin/`):
 1. `ruff format` (auto-format)
-2. `ruff check --fix` (lint + auto-fix, re-stages changed files)
+2. `ruff check --fix` (lint + auto-fix — if files are modified, stage them and commit again)
 3. `ty check` (type check — blocks commit on errors)
+
+To reinstall after cloning or recreating the venv: `pre-commit install`
