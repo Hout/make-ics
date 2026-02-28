@@ -32,6 +32,7 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 
 ## Testing
 
+- **New functionality must be developed test-first (TDD)**: write the failing test(s) before implementing the feature, then make them pass with the minimal correct implementation
 - Framework: pytest
 - Test file: `test_make_ics.py` (same directory)
 - Tests must pass before committing (`git commit` triggers the pre-commit hook)
