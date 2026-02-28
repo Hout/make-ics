@@ -20,6 +20,7 @@ type StartTimeGroup struct {
 type DateRange struct {
 	From          time.Time        `yaml:"from"`
 	To            time.Time        `yaml:"to"`
+	Weekdays      []string         `yaml:"weekdays,omitempty"`
 	FirstAdvance  *int             `yaml:"first_shift_advance,omitempty"`
 	StartTimes    []StartTimeGroup `yaml:"start_times,omitempty"`
 	Trips         *int             `yaml:"trips,omitempty"`

@@ -42,3 +42,27 @@ shift_type:
           - times: ["10:40", "11:00", "14:00", "14:20"]
           - times: ["15:00"]
             trips: 2
+  HRv_:
+    summary: "Binnendieze HRV"
+    description: "Binnendieze; Historische route Voldersgat"
+    trips: 2
+    trip_duration: 50
+    break_duration: 30
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-06-26
+        weekdays: ["Tue", "Fri"]
+        start_times:
+          - times: ["13:15", "15:15"]
+      - from: 2026-06-27
+        to: 2026-08-31
+        start_times:
+          - times: ["11:15", "13:15", "15:15"]
+      - from: 2026-09-01
+        to: 2026-10-31
+        weekdays: ["Tue", "Fri"]
+        start_times:
+          - times: ["13:15", "15:15"]
+
