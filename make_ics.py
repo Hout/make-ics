@@ -274,7 +274,8 @@ def iter_events(
         )
         duration_minutes += remains
 
-        description = t.ngettext(
+        description = f"{tr_description}\n" if tr_description else ""
+        description += t.ngettext(
             "Start {start}, arrive {n} minute early.",
             "Start {start}, arrive {n} minutes early.",
             advance,
@@ -296,8 +297,6 @@ def iter_events(
             else:
                 trip_word = t.ngettext("trip", "trips", trips)
                 description += f"\n{trips} {trip_word}"
-        if tr_description:
-            description += f"\n{tr_description}"
 
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute
