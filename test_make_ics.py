@@ -16,6 +16,7 @@ from icalendar import Event
 
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
+    build_program,
     build_trip_times,
     find_date_range,
     format_trip_schedule,
@@ -730,7 +731,7 @@ def test_format_trip_schedule_three_trips():
 
 
 def test_iter_events_description_includes_trip_schedule():
-    """Description should list trip time ranges when trip_duration is known."""
+    """Description should show a time-ordered programme when trip_duration is known."""
     shift_types_local = {
         "HRM": {
             "summary": "HRM",
@@ -748,11 +749,12 @@ def test_iter_events_description_includes_trip_schedule():
     assert events
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "Start 10:00" in desc
-    assert "- 30m in advance" in desc
-    assert "- 3x50m for trips" in desc
-    assert "- 2x30m for breaks" in desc
-    assert "3 trips: 10:00-10:50, 11:20-12:10 and 12:40-13:30" in desc
+    assert "09:30 present for preparation" in desc
+    assert "10:00 trip 1" in desc
+    assert "10:50 break 1" in desc
+    assert "11:20 trip 2" in desc
+    assert "12:10 break 2" in desc
+    assert "12:40 trip 3" in desc
 
 
 def test_iter_events_description_no_trip_schedule_when_no_trip_duration():
@@ -787,6 +789,7 @@ def test_iter_events_description_arrive_singular():
     _, event = events[0]
     desc = str(event.get("description"))
     assert "- 1m in advance" in desc
+    assert "present for preparation" not in desc
 
 
 # ---------------------------------------------------------------------------
@@ -851,7 +854,7 @@ def test_iter_events_description_nl_NL_arrive():
 
 
 def test_iter_events_description_nl_NL_trip_schedule():
-    """nl_NL locale uses Dutch trip/ritten and 'en' connector."""
+    """nl_NL locale uses Dutch programme line labels."""
     shift_types_local = {
         "HRM": {
             "summary": "HRM",
@@ -868,7 +871,10 @@ def test_iter_events_description_nl_NL_trip_schedule():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "3 tochten: 10:00-10:50, 11:20-12:10 en 12:40-13:30" in desc
+    assert "09:30 aanwezig voor voorbereiding" in desc
+    assert "10:00 tocht 1" in desc
+    assert "10:50 pauze 1" in desc
+    assert "12:40 tocht 3" in desc
 
 
 def test_iter_events_description_nl_NL_singular_minuut():
@@ -910,9 +916,10 @@ def test_description_appends_remains_after_trip_schedule():
     _, event = events[0]
     desc = str(event.get("description"))
     # last trip ends 14:00 + 3x50 + 2x30 = 14:00 + 210min = 17:30; +30min → 18:00
-    assert "- 30m afterwards → 18:00" in desc
-    assert "- 3x50m for trips" in desc
-    assert "- 2x30m for breaks" in desc
+    assert "13:30 present for preparation" in desc
+    assert "14:00 trip 1" in desc
+    assert "16:40 trip 3" in desc
+    assert "17:30 aftercare → 18:00" in desc
 
 
 def test_description_no_remains_suffix_when_zero():
@@ -959,4 +966,53 @@ def test_description_no_remains_suffix_on_non_last_shift():
     desc_first = str(events[0][1].get("description"))
     desc_last = str(events[1][1].get("description"))
     assert "→" not in desc_first
-    assert "- 30m afterwards → 15:20" in desc_last
+    assert "14:50 aftercare → 15:20" in desc_last
+
+
+# ---------------------------------------------------------------------------
+# build_program
+# ---------------------------------------------------------------------------
+
+
+def test_build_program_three_trips_with_advance_and_remains():
+    t = setup_locale("en_GB")
+    result = build_program(14, 0, 30, 3, 50, 30, 30, t)
+    lines = result.split("\n")
+    assert lines[0] == "13:30 present for preparation"
+    assert lines[1] == "14:00 trip 1"
+    assert lines[2] == "14:50 break 1"
+    assert lines[3] == "15:20 trip 2"
+    assert lines[4] == "16:10 break 2"
+    assert lines[5] == "16:40 trip 3"
+    assert lines[6] == "17:30 aftercare → 18:00"
+
+
+def test_build_program_single_trip_no_remains_no_breaks_shown():
+    t = setup_locale("en_GB")
+    result = build_program(10, 0, 30, 1, 50, 30, 0, t)
+    assert result == "09:30 present for preparation\n10:00 trip 1"
+
+
+def test_build_program_no_advance_skips_preparation():
+    t = setup_locale("en_GB")
+    result = build_program(10, 0, 0, 2, 50, 30, 0, t)
+    assert result.startswith("10:00 trip 1")
+    assert "preparation" not in result
+
+
+def test_build_program_nl_NL():
+    t = setup_locale("nl_NL")
+    result = build_program(14, 0, 30, 2, 50, 30, 30, t)
+    lines = result.split("\n")
+    assert lines[0] == "13:30 aanwezig voor voorbereiding"
+    assert lines[1] == "14:00 tocht 1"
+    assert lines[2] == "14:50 pauze 1"
+    assert lines[3] == "15:20 tocht 2"
+    assert lines[4] == "16:10 nazorg → 16:40"
+
+
+def test_build_program_no_remains_no_aftercare():
+    t = setup_locale("en_GB")
+    result = build_program(10, 0, 0, 1, 60, 0, 0, t)
+    assert "aftercare" not in result
+    assert "→" not in result

@@ -130,6 +130,38 @@ def get_duration_rationale(
     return f"{default_minutes}min (default)"
 
 
+def build_program(
+    hour: int,
+    minute: int,
+    advance: int,
+    trips: int,
+    trip_duration: int,
+    break_duration: int,
+    remains: int,
+    t: gettext.NullTranslations,
+) -> str:
+    """Return a time-ordered programme string for the event description."""
+    base = datetime(2000, 1, 1, hour, minute)
+    lines: list[str] = []
+    if advance > 0:
+        prep_time = (base - timedelta(minutes=advance)).strftime("%H:%M")
+        lines.append(f"{prep_time} {t.gettext('present for preparation')}")
+    current = base
+    for i in range(1, trips + 1):
+        lines.append(f"{current.strftime('%H:%M')} {t.gettext('trip {n}').format(n=i)}")
+        trip_end = current + timedelta(minutes=trip_duration)
+        if i < trips:
+            lines.append(f"{trip_end.strftime('%H:%M')} {t.gettext('break {n}').format(n=i)}")
+            current = trip_end + timedelta(minutes=break_duration)
+        else:
+            current = trip_end
+    if remains > 0:
+        actual_end = (current + timedelta(minutes=remains)).strftime("%H:%M")
+        after_msg = t.gettext("aftercare \u2192 {time}").format(time=actual_end)
+        lines.append(f"{current.strftime('%H:%M')} {after_msg}")
+    return "\n".join(lines)
+
+
 def build_trip_times(
     hour: int,
     minute: int,
@@ -275,33 +307,28 @@ def iter_events(
         duration_minutes += remains
 
         description = f"{tr_description}\n" if tr_description else ""
-        description += f"Start {hour:02d}:{minute:02d}"
-        description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
         if trips is not None:
             merged = {**tr, **(range_entry or {})}
-            trip_duration = merged.get("trip_duration")
-            if trip_duration is not None:
-                trip_duration = int(trip_duration)
-                break_duration = int(merged.get("break_duration", 0))
-                n_breaks = max(0, trips - 1)
-                trip_times = build_trip_times(hour, minute, trips, trip_duration, break_duration)
-                description += "\n" + t.gettext("- {trips}x{dur}m for trips").format(
-                    trips=trips, dur=trip_duration
+            trip_duration_val = merged.get("trip_duration")
+            if trip_duration_val is not None:
+                description += build_program(
+                    hour,
+                    minute,
+                    advance,
+                    trips,
+                    int(trip_duration_val),
+                    int(merged.get("break_duration", 0)),
+                    remains,
+                    t,
                 )
-                if n_breaks > 0 and break_duration > 0:
-                    description += "\n" + t.gettext("- {n}x{dur}m for breaks").format(
-                        n=n_breaks, dur=break_duration
-                    )
-                if remains:
-                    last_end_dt = datetime.strptime(trip_times[-1][1], "%H:%M")
-                    actual_end = (last_end_dt + timedelta(minutes=remains)).strftime("%H:%M")
-                    description += "\n" + t.gettext("- {n}m afterwards → {time}").format(
-                        n=remains, time=actual_end
-                    )
-                description += "\n" + format_trip_schedule(trip_times, t)
             else:
                 trip_word = t.ngettext("trip", "trips", trips)
+                description += f"Start {hour:02d}:{minute:02d}"
+                description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
                 description += f"\n{trips} {trip_word}"
+        else:
+            description += f"Start {hour:02d}:{minute:02d}"
+            description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
 
         dt_appt = datetime(
             appt_date.year, appt_date.month, appt_date.day, hour, minute

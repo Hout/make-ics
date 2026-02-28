@@ -13,19 +13,17 @@ msgid_plural "trips"
 msgstr[0] "tocht"
 msgstr[1] "tochten"
 
-msgid "Start {start}, arrive {n} minute early."
-msgid_plural "Start {start}, arrive {n} minutes early."
-msgstr[0] "Start {start}, {n} minuut voor aanvang aanwezig zijn."
-msgstr[1] "Start {start}, {n} minuten voor aanvang aanwezig zijn."
-
 msgid "- {n}m in advance"
 msgstr "- {n}m van tevoren"
 
-msgid "- {trips}x{dur}m for trips"
-msgstr "- {trips}x{dur}m voor tochten"
+msgid "present for preparation"
+msgstr "aanwezig voor voorbereiding"
 
-msgid "- {n}x{dur}m for breaks"
-msgstr "- {n}x{dur}m voor pauzes"
+msgid "trip {n}"
+msgstr "tocht {n}"
 
-msgid "- {n}m afterwards → {time}"
-msgstr "- {n}m achteraf → {time}"
+msgid "break {n}"
+msgstr "pauze {n}"
+
+msgid "aftercare → {time}"
+msgstr "nazorg → {time}"
