@@ -53,6 +53,7 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 - **Never use heredocs** (`<<EOF ... EOF`) in terminal commands — they corrupt the shell session
 - **Never inline multi-line Python or shell via quoted strings** (`-c "..."`) for anything beyond a trivial one-liner; write the code to a `.py` file instead and execute that
 - **Write temporary files to `.scratch/`** (a hidden, gitignored folder in the workspace root), then run them with the venv Python and delete the file immediately after use. Do NOT use /tmp/ or similar system temp directories.
+- **Always use `.venv` for Python executions** — invoke Python as `.venv/bin/python` (never bare `python` or `python3`); similarly use `.venv/bin/pip`, `.venv/bin/ruff`, etc.
 
 ## Pre-commit Hook
 
