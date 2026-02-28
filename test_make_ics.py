@@ -750,7 +750,7 @@ def test_iter_events_description_includes_trip_schedule():
     assert events
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "09:30 present for preparation" in desc
+    assert "09:30 preparation" in desc
     assert "10:00 trip 1" in desc
     assert "10:50 break 1" in desc
     assert "11:20 trip 2" in desc
@@ -790,7 +790,7 @@ def test_iter_events_description_arrive_singular():
     _, event = events[0]
     desc = str(event.get("description"))
     assert "- 1m in advance" in desc
-    assert "present for preparation" not in desc
+    assert "preparation" not in desc
 
 
 # ---------------------------------------------------------------------------
@@ -872,7 +872,7 @@ def test_iter_events_description_nl_NL_trip_schedule():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "09:30 aanwezig voor voorbereiding" in desc
+    assert "09:30 voorbereiding" in desc
     assert "10:00 tocht 1" in desc
     assert "10:50 pauze 1" in desc
     assert "12:40 tocht 3" in desc
@@ -917,7 +917,7 @@ def test_description_appends_remains_after_trip_schedule():
     _, event = events[0]
     desc = str(event.get("description"))
     # last trip ends 14:00 + 3x50 + 2x30 = 14:00 + 210min = 17:30; +30min → 18:00
-    assert "13:30 present for preparation" in desc
+    assert "13:30 preparation" in desc
     assert "14:00 trip 1" in desc
     assert "16:40 trip 3" in desc
     assert "17:30 aftercare → 18:00" in desc
@@ -979,7 +979,7 @@ def test_build_program_three_trips_with_advance_and_remains():
     t = setup_locale("en_GB")
     result = build_program(14, 0, 30, 3, 50, 30, 30, t)
     lines = result.split("\n")
-    assert lines[0] == "13:30 present for preparation"
+    assert lines[0] == "13:30 preparation"
     assert lines[1] == "14:00 trip 1"
     assert lines[2] == "14:50 break 1"
     assert lines[3] == "15:20 trip 2"
@@ -991,7 +991,7 @@ def test_build_program_three_trips_with_advance_and_remains():
 def test_build_program_single_trip_no_remains_no_breaks_shown():
     t = setup_locale("en_GB")
     result = build_program(10, 0, 30, 1, 50, 30, 0, t)
-    assert result == "09:30 present for preparation\n10:00 trip 1"
+    assert result == "09:30 preparation\n10:00 trip 1"
 
 
 def test_build_program_no_advance_skips_preparation():
@@ -1005,7 +1005,7 @@ def test_build_program_nl_NL():
     t = setup_locale("nl_NL")
     result = build_program(14, 0, 30, 2, 50, 30, 30, t)
     lines = result.split("\n")
-    assert lines[0] == "13:30 aanwezig voor voorbereiding"
+    assert lines[0] == "13:30 voorbereiding"
     assert lines[1] == "14:00 tocht 1"
     assert lines[2] == "14:50 pauze 1"
     assert lines[3] == "15:20 tocht 2"

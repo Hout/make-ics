@@ -16,8 +16,8 @@ msgstr[1] "tochten"
 msgid "- {n}m in advance"
 msgstr "- {n}m van tevoren"
 
-msgid "present for preparation"
-msgstr "aanwezig voor voorbereiding"
+msgid "preparation"
+msgstr "voorbereiding"
 
 msgid "trip {n}"
 msgstr "tocht {n}"

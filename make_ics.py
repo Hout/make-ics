@@ -145,7 +145,7 @@ def build_program(
     lines: list[str] = []
     if advance > 0:
         prep_time = (base - timedelta(minutes=advance)).strftime("%H:%M")
-        lines.append(f"{prep_time} {t.gettext('present for preparation')}")
+        lines.append(f"{prep_time} {t.gettext('preparation')}")
     current = base
     for i in range(1, trips + 1):
         lines.append(f"{current.strftime('%H:%M')} {t.gettext('trip {n}').format(n=i)}")
