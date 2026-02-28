@@ -90,6 +90,32 @@ def get_last_shift_remains(shift: dict, range_entry: dict | None) -> int:
     return int(merged.get("last_shift_remains", 0))
 
 
+def get_duration_rationale(
+    shift: dict,
+    range_entry: dict | None,
+    trips: int | None,
+    default_minutes: int,
+    last_shift_remains: int = 0,
+) -> str:
+    """Return a human-readable string explaining how the duration was calculated."""
+    if trips:
+        merged = {**shift, **(range_entry or {})}
+        trip_duration = merged.get("trip_duration")
+        if trip_duration is not None:
+            trip_duration = int(trip_duration)
+            break_duration = int(merged.get("break_duration", 0))
+            n_breaks = max(0, trips - 1)
+            parts = f"{trips}x{trip_duration}"
+            if n_breaks:
+                parts += f"+{n_breaks}x{break_duration}"
+            base = trips * trip_duration + n_breaks * break_duration
+            rationale = f"{parts}={base}min"
+            if last_shift_remains:
+                rationale += f"+{last_shift_remains}min"
+            return rationale
+    return f"{default_minutes}min (default)"
+
+
 def parse_dutch_date(date_str: str) -> date:
     """Parse a Dutch date string like '03-apr-26' using dateparser."""
     parsed = dateparser.parse(date_str.strip(), languages=["nl"])
@@ -183,8 +209,11 @@ def iter_events(
         duration_minutes = get_shift_duration_minutes(
             tr, range_entry, trips, int(duration_hours * 60)
         )
-        if is_last:
-            duration_minutes += get_last_shift_remains(tr, range_entry)
+        remains = get_last_shift_remains(tr, range_entry) if is_last else 0
+        rationale = get_duration_rationale(
+            tr, range_entry, trips, int(duration_hours * 60), remains
+        )
+        duration_minutes += remains
 
         description = f"Start {hour:02d}:{minute:02d}"
         if trips is not None:
@@ -208,7 +237,7 @@ def iter_events(
 
         label = (
             f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
-            f"  (-{advance}min +{duration_minutes}min)"
+            f"  (-{advance}min +{duration_minutes}min: {rationale})"
         )
         yield label, event
 

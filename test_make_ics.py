@@ -11,6 +11,7 @@ from datetime import date
 from unittest.mock import MagicMock
 
 import pytest
+from icalendar import Event
 
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
@@ -68,7 +69,7 @@ def make_ws(*rows: tuple) -> MagicMock:
     return ws
 
 
-def collect(ws, advance: int = DEFAULT_ADVANCE_MINUTES) -> list[tuple[str, object]]:
+def collect(ws, advance: int = DEFAULT_ADVANCE_MINUTES) -> list[tuple[str, Event]]:
     return list(iter_events(ws, duration_hours=4, advance_minutes=advance, shift_types=SHIFT_TYPES))
 
 

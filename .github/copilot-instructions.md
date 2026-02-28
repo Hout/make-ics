@@ -28,7 +28,7 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 - `find_date_range(date_ranges, appt_date, start_time)` returns a merged dict (range entry + matching `start_times` group); callers should treat the result as the authoritative source for all per-shift overrides
 - Duration formula: `trips × trip_duration + max(0, trips − 1) × break_duration`
 - `iter_events` pre-collects all rows before yielding, to support first/last-shift detection per `(code, date)` pair
-- Event label format: `"YYYY-MM-DD HH:MM  <summary>  (−Xmin +Ymin)"`
+- Event label format: `"YYYY-MM-DD HH:MM  <summary>  (−Xmin +Ymin: AxB+CxD=Ymin)"`
 
 ## Testing
 
