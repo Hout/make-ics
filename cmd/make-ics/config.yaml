@@ -65,4 +65,74 @@ shift_type:
         weekdays: ["Tue", "Fri"]
         start_times:
           - times: ["13:15", "15:15"]
-
+  VRk_:
+    summary: "Binnendieze VRK"
+    description: "Binnendieze; Vestingroute Koninginnesteiger"
+    trips: 2
+    trip_duration: 75
+    break_duration: 30
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-10-31
+        start_times:
+          - times: ["10:15", "13:45"]
+  JBRv:
+    summary: "Binnendieze JBRV"
+    description: "Binnendieze; Jeroen Boschroute Voldersgat"
+    trips: 2
+    trip_duration: 75
+    break_duration: 30
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-10-31
+        start_times:
+          - times: ["10:15", "13:45"]
+  HTS_:
+    summary: "Binnendieze HTS"
+    description: "Binnendieze; Hertogstadroute"
+    trips: 1
+    trip_duration: 90
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-06-26
+        start_times:
+          - times: ["10:30", "10:45", "12:50", "13:05"]
+      - from: 2026-06-27
+        to: 2026-08-31
+        start_times:
+          - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]
+      - from: 2026-09-01
+        to: 2026-10-31
+        start_times:
+          - times: ["10:30", "10:45", "12:50", "13:05"]
+  KHR_:
+    summary: "Binnendieze KHR"
+    description: "Binnendieze; Kruithuisroute"
+    trips: 1
+    trip_duration: 50
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-10-31
+        weekdays: ["Sat", "Sun"]
+        start_times:
+          - times: ["12:10"]
+  WS__:
+    summary: "Binnendieze WS"
+    description: "Binnendieze; Walschipper"
+    trips: 1
+    trip_duration: 180
+    first_shift_advance: 30
+    last_shift_remains: 30
+    date_ranges:
+      - from: 2026-04-01
+        to: 2026-10-31
+        start_times:
+          - times: ["10:00", "14:00"]
