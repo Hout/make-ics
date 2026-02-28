@@ -495,8 +495,8 @@ def test_duration_rationale_with_last_shift_remains():
 
 def test_duration_rationale_no_break_duration_field():
     shift = {"trip_duration": 60}
-    # break_duration defaults to 0, n_breaks=1 but 0-valued so branch not printed
-    assert get_duration_rationale(shift, None, 2, 240) == "2x60+1x0=120min"
+    # break_duration defaults to 0 — zero-value breaks are suppressed
+    assert get_duration_rationale(shift, None, 2, 240) == "2x60=120min"
 
 
 # ---------------------------------------------------------------------------
@@ -546,6 +546,14 @@ def test_is_data_row_false_when_no_time():
 
 def test_is_data_row_false_when_date_pattern_mismatch():
     assert is_data_row(("Datum", "Dienst", "Tijd")) is False
+
+
+def test_is_data_row_false_when_too_few_columns():
+    assert is_data_row(("03-apr-26", "HRm_")) is False
+
+
+def test_is_data_row_true_with_extra_trailing_columns():
+    assert is_data_row(("03-apr-26", "HRm_", "14:40 uur", None, None)) is True
 
 
 # ---------------------------------------------------------------------------
@@ -610,6 +618,22 @@ def test_iter_events_appends_description_when_shift_has_description():
     events = list(iter_events(ws, shift_types=shift_types))
     _, event = events[0]
     assert "Some route detail" in str(event.get("description"))
+
+
+def test_iter_events_handles_wide_rows():
+    """Rows with additional trailing columns beyond the 3 expected must not crash."""
+    ws = make_ws(("03-apr-26", "HRm_", "14:40 uur", "extra", None))
+    events = collect(ws)
+    assert len(events) == 1
+
+
+def test_iter_events_event_datetimes_are_timezone_aware():
+    """dtstart and dtend must be timezone-aware (DST-correct local time)."""
+    ws = make_ws(("03-apr-26", "HRm_", "14:40 uur"))
+    events = collect(ws)
+    _, event = events[0]
+    assert event.get("dtstart").dt.tzinfo is not None
+    assert event.get("dtend").dt.tzinfo is not None
 
 
 # ---------------------------------------------------------------------------

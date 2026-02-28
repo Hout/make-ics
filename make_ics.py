@@ -18,7 +18,6 @@ from icalendar import Calendar, Event
 # --- Configuration ---
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
-TIMEZONE = datetime.now().astimezone().tzinfo
 TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
 
 
@@ -56,7 +55,7 @@ def find_date_range(
 
 def get_trips(shift: dict, range_entry: dict | None) -> int | None:
     """Return trip count from the resolved range entry, falling back to shift default."""
-    default = (range_entry or {}).get("trips") if range_entry else None
+    default = (range_entry or {}).get("trips")
     if default is None:
         default = shift.get("trips")
     return int(default) if default is not None else None
@@ -106,7 +105,7 @@ def get_duration_rationale(
             break_duration = int(merged.get("break_duration", 0))
             n_breaks = max(0, trips - 1)
             parts = f"{trips}x{trip_duration}"
-            if n_breaks:
+            if n_breaks and break_duration:
                 parts += f"+{n_breaks}x{break_duration}"
             base = trips * trip_duration + n_breaks * break_duration
             rationale = f"{parts}={base}min"
@@ -135,7 +134,9 @@ def parse_time(time_str: str) -> tuple[int, int]:
 
 def is_data_row(row: tuple) -> bool:
     """Return True if the row looks like an appointment row (has date and time)."""
-    date_val, _, time_val = row
+    if len(row) < 3:
+        return False
+    date_val, _, time_val, *__ = row
     if not date_val or not time_val:
         return False
     date_str = str(date_val).strip()
@@ -159,7 +160,7 @@ def _collect_rows(ws) -> list[tuple[str, date, int, int]]:
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
             continue
-        date_str, dienst_str, time_str = row
+        date_str, dienst_str, time_str, *_ = row
         code = str(dienst_str).strip() if dienst_str else "Afspraak"
         try:
             appt_date = parse_dutch_date(str(date_str))
@@ -227,8 +228,8 @@ def iter_events(
             description += f"\n{tr_description}"
 
         dt_appt = datetime(
-            appt_date.year, appt_date.month, appt_date.day, hour, minute, tzinfo=TIMEZONE
-        )
+            appt_date.year, appt_date.month, appt_date.day, hour, minute
+        ).astimezone()
         dt_start = dt_appt - timedelta(minutes=advance)
         dt_end = dt_appt + timedelta(minutes=duration_minutes)
 
