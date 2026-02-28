@@ -4,6 +4,7 @@ containing all appointments.
 """
 
 import argparse
+import gettext
 import re
 import uuid
 from collections.abc import Iterator
@@ -18,7 +19,21 @@ from icalendar import Calendar, Event
 # --- Configuration ---
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
+DEFAULT_LOCALE = "nl_NL"
 TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
+LOCALE_DIR = Path(__file__).parent / "locale"
+
+
+def setup_locale(locale_code: str) -> gettext.NullTranslations:
+    """Return a translations object for the given locale code.
+
+    Falls back to NullTranslations (source-language pass-through) when no
+    compiled catalogue is found for the requested locale.
+    """
+    try:
+        return gettext.translation("make_ics", localedir=str(LOCALE_DIR), languages=[locale_code])
+    except FileNotFoundError:
+        return gettext.NullTranslations()
 
 
 def load_config() -> dict:
@@ -115,8 +130,44 @@ def get_duration_rationale(
     return f"{default_minutes}min (default)"
 
 
+def build_trip_times(
+    hour: int,
+    minute: int,
+    trips: int,
+    trip_duration: int,
+    break_duration: int,
+) -> list[tuple[str, str]]:
+    """Return a list of (start_str, end_str) HH:MM strings for each trip."""
+    result: list[tuple[str, str]] = []
+    base = datetime(2000, 1, 1, hour, minute)
+    offset = 0
+    for _ in range(trips):
+        t_start = base + timedelta(minutes=offset)
+        t_end = t_start + timedelta(minutes=trip_duration)
+        result.append((t_start.strftime("%H:%M"), t_end.strftime("%H:%M")))
+        offset += trip_duration + break_duration
+    return result
+
+
+def format_trip_schedule(
+    trip_times: list[tuple[str, str]],
+    t: gettext.NullTranslations | None = None,
+) -> str:
+    """Return a human-readable schedule string like '3 trips: 10:00-10:50, … and 12:40-13:30'."""
+    if t is None:
+        t = gettext.NullTranslations()
+    n = len(trip_times)
+    segments = [f"{s}-{e}" for s, e in trip_times]
+    trip_word = t.ngettext("trip", "trips", n)
+    and_word = t.gettext("and")
+    if n <= 1:
+        return f"{n} {trip_word}: {segments[0]}"
+    return f"{n} {trip_word}: {', '.join(segments[:-1])} {and_word} {segments[-1]}"
+
+
 def parse_dutch_date(date_str: str) -> date:
     """Parse a Dutch date string like '03-apr-26' using dateparser."""
+
     parsed = dateparser.parse(date_str.strip(), languages=["nl"])
     if parsed is None:
         raise ValueError(f"Could not parse date: {date_str!r}")
@@ -177,8 +228,10 @@ def iter_events(
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
     shift_types: dict[str, dict] | None = None,
+    locale: str = DEFAULT_LOCALE,
 ) -> Iterator[tuple[str, Event]]:
     """Yield (label, Event) for each appointment row in the worksheet."""
+    t = setup_locale(locale)
     parsed_rows = _collect_rows(ws)
 
     # Build maps: first and last row index per (code, date).
@@ -221,9 +274,23 @@ def iter_events(
         )
         duration_minutes += remains
 
-        description = f"Start {hour:02d}:{minute:02d}"
+        description = t.ngettext(
+            "Start {start}, arrive {n} minute early.",
+            "Start {start}, arrive {n} minutes early.",
+            advance,
+        ).format(start=f"{hour:02d}:{minute:02d}", n=advance)
         if trips is not None:
-            description += f"  |  Ritten: {trips}"
+            merged = {**tr, **(range_entry or {})}
+            trip_duration = merged.get("trip_duration")
+            if trip_duration is not None:
+                break_duration = int(merged.get("break_duration", 0))
+                trip_times = build_trip_times(
+                    hour, minute, trips, int(trip_duration), break_duration
+                )
+                description += f"\n{format_trip_schedule(trip_times, t)}"
+            else:
+                trip_word = t.ngettext("trip", "trips", trips)
+                description += f"\n{trips} {trip_word}"
         if tr_description:
             description += f"\n{tr_description}"
 
@@ -277,6 +344,13 @@ def main():
             f" (default: {DEFAULT_ADVANCE_MINUTES})"
         ),
     )
+    parser.add_argument(
+        "-l",
+        "--locale",
+        default=DEFAULT_LOCALE,
+        metavar="LOCALE",
+        help=f"Locale for event descriptions, e.g. nl_NL or en_GB (default: {DEFAULT_LOCALE})",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -298,6 +372,7 @@ def main():
         duration_hours=args.duration,
         advance_minutes=args.advance,
         shift_types=shift_types,
+        locale=args.locale,
     ):
         cal.add_component(event)
         count += 1

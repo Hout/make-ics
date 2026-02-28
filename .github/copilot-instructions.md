@@ -64,3 +64,14 @@ Hooks (all `local`, pointing to `.venv/bin/`):
 3. `ty check` (type check — blocks commit on errors)
 
 To reinstall after cloning or recreating the venv: `pre-commit install`
+
+## Completing a Feature
+
+After every new or changed feature, run these steps in order before considering the work done:
+
+1. **Format** — `ruff format make_ics.py test_make_ics.py`
+2. **Lint** — `ruff check make_ics.py test_make_ics.py` (must be clean)
+3. **Type-check** — `ty check make_ics.py` (must be clean)
+4. **Test** — `.venv/bin/pytest test_make_ics.py -q` (all must pass)
+5. **Smoke-test** — `.venv/bin/python make_ics.py report.xlsx` and verify output
+6. **Commit** — `git add -A && git commit -m "<concise description>"` (pre-commit hooks re-run steps 1–3 automatically; fix any remaining issues and commit again)

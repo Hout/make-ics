@@ -1,0 +1,19 @@
+# Dutch (nl_NL) translations for make_ics.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "and"
+msgstr "en"
+
+msgid "trip"
+msgid_plural "trips"
+msgstr[0] "rit"
+msgstr[1] "ritten"
+
+msgid "Start {start}, arrive {n} minute early."
+msgid_plural "Start {start}, arrive {n} minutes early."
+msgstr[0] "Start {start}, {n} minuut eerder aanwezig zijn."
+msgstr[1] "Start {start}, {n} minuten eerder aanwezig zijn."

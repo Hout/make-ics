@@ -16,7 +16,9 @@ from icalendar import Event
 
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
+    build_trip_times,
     find_date_range,
+    format_trip_schedule,
     get_duration_rationale,
     get_last_shift_remains,
     get_shift_duration_minutes,
@@ -28,6 +30,7 @@ from make_ics import (
     make_calendar,
     parse_dutch_date,
     parse_time,
+    setup_locale,
 )
 
 # ---------------------------------------------------------------------------
@@ -77,8 +80,14 @@ def make_ws(*rows: tuple) -> MagicMock:
     return ws
 
 
-def collect(ws, advance: int = DEFAULT_ADVANCE_MINUTES) -> list[tuple[str, Event]]:
-    return list(iter_events(ws, duration_hours=4, advance_minutes=advance, shift_types=SHIFT_TYPES))
+def collect(
+    ws, advance: int = DEFAULT_ADVANCE_MINUTES, locale: str = "en_GB"
+) -> list[tuple[str, Event]]:
+    return list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=advance, shift_types=SHIFT_TYPES, locale=locale
+        )
+    )
 
 
 def advance_of(label: str) -> int:
@@ -371,8 +380,8 @@ def test_trip_override_applied_to_all_shifts_with_matching_start_time():
     )
     events = collect(ws)
     descriptions = [str(event.get("description")) for _, event in events]
-    assert "Ritten: 3" in descriptions[0]
-    assert "Ritten: 3" in descriptions[1]
+    assert "3 trips" in descriptions[0]
+    assert "3 trips" in descriptions[1]
 
 
 # ---------------------------------------------------------------------------
@@ -669,3 +678,207 @@ def test_main_accepts_custom_duration_and_advance(monkeypatch, tmp_path):
     monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-d", "2", "-a", "15"])
     main()
     assert (tmp_path / "report.ics").exists()
+
+
+# ---------------------------------------------------------------------------
+# build_trip_times
+# ---------------------------------------------------------------------------
+
+
+def test_build_trip_times_single_trip():
+    assert build_trip_times(10, 0, 1, 50, 30) == [("10:00", "10:50")]
+
+
+def test_build_trip_times_three_trips():
+    assert build_trip_times(10, 0, 3, 50, 30) == [
+        ("10:00", "10:50"),
+        ("11:20", "12:10"),
+        ("12:40", "13:30"),
+    ]
+
+
+def test_build_trip_times_no_break():
+    assert build_trip_times(9, 0, 2, 30, 0) == [("09:00", "09:30"), ("09:30", "10:00")]
+
+
+def test_build_trip_times_non_zero_start_minute():
+    assert build_trip_times(14, 40, 2, 50, 30) == [("14:40", "15:30"), ("16:00", "16:50")]
+
+
+# ---------------------------------------------------------------------------
+# format_trip_schedule
+# ---------------------------------------------------------------------------
+
+
+def test_format_trip_schedule_single_trip():
+    assert format_trip_schedule([("10:00", "10:50")]) == "1 trip: 10:00-10:50"
+
+
+def test_format_trip_schedule_two_trips():
+    result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10")])
+    assert result == "2 trips: 10:00-10:50 and 11:20-12:10"
+
+
+def test_format_trip_schedule_three_trips():
+    result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10"), ("12:40", "13:30")])
+    assert result == "3 trips: 10:00-10:50, 11:20-12:10 and 12:40-13:30"
+
+
+# ---------------------------------------------------------------------------
+# Description format in iter_events
+# ---------------------------------------------------------------------------
+
+
+def test_iter_events_description_includes_trip_schedule():
+    """Description should list trip time ranges when trip_duration is known."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 3,
+            "trip_duration": 50,
+            "break_duration": 30,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRM", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    assert events
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "Start 10:00" in desc
+    assert "arrive 30 minutes early" in desc
+    assert "3 trips: 10:00-10:50, 11:20-12:10 and 12:40-13:30" in desc
+
+
+def test_iter_events_description_no_trip_schedule_when_no_trip_duration():
+    """Description should not list trip time ranges when trip_duration is unknown."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 3,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRM", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "Start 10:00" in desc
+    assert re.search(r"\d{2}:\d{2}-\d{2}:\d{2}", desc) is None
+
+
+def test_iter_events_description_arrive_singular():
+    """'1 minute' (no s) should be used when advance is 1."""
+    shift_types_local = {"X": {"summary": "X"}}
+    ws = make_ws(("03-apr-26", "X", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=1, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "arrive 1 minute early" in desc
+
+
+# ---------------------------------------------------------------------------
+# i18n — setup_locale, format_trip_schedule with translations, nl_NL output
+# ---------------------------------------------------------------------------
+
+
+def test_setup_locale_returns_null_translations_for_unknown_locale():
+    import gettext
+
+    t = setup_locale("xx_XX")
+    assert isinstance(t, gettext.NullTranslations)
+
+
+def test_setup_locale_nl_NL_translates_and():
+    t = setup_locale("nl_NL")
+    assert t.gettext("and") == "en"
+
+
+def test_setup_locale_en_GB_returns_source_strings():
+    t = setup_locale("en_GB")
+    assert t.gettext("and") == "and"
+
+
+def test_format_trip_schedule_nl_NL_single_trip():
+    t = setup_locale("nl_NL")
+    assert format_trip_schedule([("10:00", "10:50")], t) == "1 rit: 10:00-10:50"
+
+
+def test_format_trip_schedule_nl_NL_two_trips():
+    t = setup_locale("nl_NL")
+    result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10")], t)
+    assert result == "2 ritten: 10:00-10:50 en 11:20-12:10"
+
+
+def test_format_trip_schedule_nl_NL_three_trips():
+    t = setup_locale("nl_NL")
+    result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10"), ("12:40", "13:30")], t)
+    assert result == "3 ritten: 10:00-10:50, 11:20-12:10 en 12:40-13:30"
+
+
+def test_format_trip_schedule_en_GB_unchanged():
+    t = setup_locale("en_GB")
+    result = format_trip_schedule([("10:00", "10:50"), ("11:20", "12:10")], t)
+    assert result == "2 trips: 10:00-10:50 and 11:20-12:10"
+
+
+def test_iter_events_description_nl_NL_arrive():
+    """nl_NL locale produces Dutch arrive sentence."""
+    shift_types_local = {"X": {"summary": "X"}}
+    ws = make_ws(("03-apr-26", "X", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="nl_NL"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "Start 10:00" in desc
+    assert "30 minuten" in desc
+    assert "arrive" not in desc
+
+
+def test_iter_events_description_nl_NL_trip_schedule():
+    """nl_NL locale uses Dutch trip/ritten and 'en' connector."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 3,
+            "trip_duration": 50,
+            "break_duration": 30,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRM", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="nl_NL"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "3 ritten: 10:00-10:50, 11:20-12:10 en 12:40-13:30" in desc
+
+
+def test_iter_events_description_nl_NL_singular_minuut():
+    """1 minuut (not minuten) in nl_NL."""
+    shift_types_local = {"X": {"summary": "X"}}
+    ws = make_ws(("03-apr-26", "X", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=1, shift_types=shift_types_local, locale="nl_NL"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "1 minuut" in desc
+    assert "minuten" not in desc
