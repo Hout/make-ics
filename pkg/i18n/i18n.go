@@ -42,5 +42,3 @@ func (l *Localizer) N(id string, pluralCount int, templateData map[string]interf
 	msg, _ := l.loc.Localize(&goweb_i18n.LocalizeConfig{MessageID: id, PluralCount: &pluralCount, TemplateData: templateData})
 	return msg
 }
-
-

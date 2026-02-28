@@ -1,8 +1,16 @@
+# Go
+make-ics
+make-ics.exe
+coverage.out
+
+# Inputs / outputs
+*.ics
+*.xlsx
+*.zip
+
+# Python (archive only)
 .venv/
 .scratch/
 __pycache__/
 *.pyc
-*.ics
-*.zip
-*.xlsx
 .coverage

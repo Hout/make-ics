@@ -59,7 +59,7 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 			fmt.Fprintf(os.Stderr, "  [SKIP] Could not parse time %q: %v\n", r[2], err)
 			continue
 		}
-		parsed = append(parsed, struct{
+		parsed = append(parsed, struct {
 			Code string
 			Date time.Time
 			Hour int
@@ -167,4 +167,3 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 	}
 	return events, nil
 }
-
