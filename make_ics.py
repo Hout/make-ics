@@ -372,24 +372,6 @@ def main():
         metavar="HOURS",
         help=f"Duration of each appointment in hours (default: {DEFAULT_DURATION_HOURS})",
     )
-    parser.add_argument(
-        "-a",
-        "--advance",
-        type=int,
-        default=DEFAULT_ADVANCE_MINUTES,
-        metavar="MINUTES",
-        help=(
-            f"Start event N minutes before the appointment time"
-            f" (default: {DEFAULT_ADVANCE_MINUTES})"
-        ),
-    )
-    parser.add_argument(
-        "-l",
-        "--locale",
-        default=DEFAULT_LOCALE,
-        metavar="LOCALE",
-        help=f"Locale for event descriptions, e.g. nl_NL or en_GB (default: {DEFAULT_LOCALE})",
-    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -405,14 +387,14 @@ def main():
     config = load_config()
     shift_types = config.get("shift_type") or {}
     timezone = config.get("timezone", DEFAULT_TIMEZONE)
+    locale = config.get("locale", DEFAULT_LOCALE)
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
         ws,
         duration_hours=args.duration,
-        advance_minutes=args.advance,
         shift_types=shift_types,
-        locale=args.locale,
+        locale=locale,
         timezone=timezone,
     ):
         cal.add_component(event)

@@ -672,12 +672,12 @@ def test_main_runs_successfully_on_real_report(monkeypatch, tmp_path):
 
 
 @pytest.mark.skipif(not REPORT.exists(), reason="report.xlsx not present")
-def test_main_accepts_custom_duration_and_advance(monkeypatch, tmp_path):
+def test_main_accepts_custom_duration(monkeypatch, tmp_path):
     import shutil
 
     xlsx = tmp_path / "report.xlsx"
     shutil.copy(REPORT, xlsx)
-    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-d", "2", "-a", "15"])
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-d", "2"])
     main()
     assert (tmp_path / "report.ics").exists()
 
