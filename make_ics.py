@@ -6,23 +6,43 @@ containing all appointments.
 import argparse
 import gettext
 import re
+import typing
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import dateparser
 import openpyxl
 import yaml
 from icalendar import Calendar, Event
 
+
+# --- TypedDicts for config ---
+class ShiftTypeDict(typing.TypedDict, total=False):
+    summary: str
+    description: str
+    trips: int
+    date_ranges: list[dict]
+    first_shift_advance: int
+    trip_duration: int
+    break_duration: int
+    last_shift_remains: int
+
+
+class ConfigDict(typing.TypedDict):
+    timezone: str
+    locale: str
+    shift_type: dict[str, ShiftTypeDict]
+
+
 # --- Configuration ---
 DEFAULT_DURATION_HOURS = 4
 DEFAULT_ADVANCE_MINUTES = 30
 DEFAULT_LOCALE = "nl_NL"
 DEFAULT_TIMEZONE = "Europe/Amsterdam"
-TRANSLATIONS_FILE = Path(__file__).parent / "config.yaml"
+CONFIG_DEFAULT_PATH = Path(__file__).parent / "config.yaml"
 LOCALE_DIR = Path(__file__).parent / "locale"
 
 
@@ -38,12 +58,69 @@ def setup_locale(locale_code: str) -> gettext.NullTranslations:
         return gettext.NullTranslations()
 
 
-def load_config() -> dict:
-    """Load config.yaml, returning an empty dict if the file is missing."""
-    if not TRANSLATIONS_FILE.exists():
+def load_config(path: Path) -> dict[str, object]:  # returns untyped, validated later
+    """Load YAML configuration from a given path.
+
+    Returns an empty dict when the file does not exist or is empty. This keeps
+    callers simple during testing and allows us to validate the resulting
+    mapping separately.
+    """
+    if not path.exists():
         return {}
-    with TRANSLATIONS_FILE.open(encoding="utf-8") as f:
+    with path.open(encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def validate_config(config: dict[str, object], path: Path) -> None:
+    """Ensure that ``config`` contains all required top-level keys.
+
+    A missing key or an invalid value results in SystemExit with a message
+    that includes a small example configuration. The caller should run this
+    immediately after loading the YAML so the program fails fast with a clear
+    error.
+    """
+    required = ["timezone", "locale", "shift_type"]
+    missing = [k for k in required if k not in config]
+    if missing:
+        example = (
+            "Example config.yaml:\n"
+            "timezone: Europe/Amsterdam\n"
+            "locale: nl_NL.UTF-8\n"
+            "shift_type:\n"
+            "  A: { summary: 'Foo' }\n"
+        )
+        raise SystemExit(
+            f"Config file '{path}' is missing required key(s): {', '.join(missing)}\n\n" + example
+        )
+
+    # timezone validity
+    tz = config.get("timezone")
+    try:
+        ZoneInfo(tz)  # type: ignore[arg-type]
+    except ZoneInfoNotFoundError:
+        raise SystemExit(
+            f"Config file '{path}' has invalid timezone: {tz!r}.\n"
+            "Provide a valid IANA timezone string (e.g. 'Europe/Amsterdam')."
+        ) from None
+    except Exception:
+        # covers non-string or missing values
+        raise SystemExit(
+            f"Config file '{path}' has invalid timezone: {tz!r}.\n"
+            "Provide a valid IANA timezone string (e.g. 'Europe/Amsterdam')."
+        ) from None
+
+    # locale sanity
+    loc = config.get("locale")
+    if not isinstance(loc, str) or not loc:
+        raise SystemExit(
+            f"Config file '{path}' has invalid locale: {loc!r}.\n"
+            "Provide a valid locale identifier (e.g. 'nl_NL.UTF-8')."
+        )
+
+    # shift_type must be a non-empty dict
+    st = config.get("shift_type")
+    if not isinstance(st, dict) or not st:
+        raise SystemExit(f"Config file '{path}' has invalid or empty shift_type section.")
 
 
 def find_date_range(
@@ -70,7 +147,9 @@ def find_date_range(
     return None
 
 
-def get_trips(shift: dict, range_entry: dict | None) -> int | None:
+def get_trips(
+    shift: typing.Mapping[str, typing.Any], range_entry: typing.Mapping[str, typing.Any] | None
+) -> int | None:
     """Return trip count from the resolved range entry, falling back to shift default."""
     default = (range_entry or {}).get("trips")
     if default is None:
@@ -79,8 +158,8 @@ def get_trips(shift: dict, range_entry: dict | None) -> int | None:
 
 
 def get_shift_duration_minutes(
-    shift: dict,
-    range_entry: dict | None,
+    shift: typing.Mapping[str, typing.Any],
+    range_entry: typing.Mapping[str, typing.Any] | None,
     trips: int | None,
     default_minutes: int,
 ) -> int:
@@ -92,7 +171,7 @@ def get_shift_duration_minutes(
     """
     if not trips:
         return default_minutes
-    merged = {**shift, **(range_entry or {})}
+    merged = {**dict(shift), **(range_entry or {})}
     trip_duration = merged.get("trip_duration")
     if trip_duration is None:
         return default_minutes
@@ -100,22 +179,24 @@ def get_shift_duration_minutes(
     return int(trips) * int(trip_duration) + max(0, trips - 1) * break_duration
 
 
-def get_last_shift_remains(shift: dict, range_entry: dict | None) -> int:
+def get_last_shift_remains(
+    shift: typing.Mapping[str, typing.Any], range_entry: typing.Mapping[str, typing.Any] | None
+) -> int:
     """Return the extra minutes appended to the last shift of the day, or 0."""
-    merged = {**shift, **(range_entry or {})}
+    merged = {**dict(shift), **(range_entry or {})}
     return int(merged.get("last_shift_remains", 0))
 
 
 def get_duration_rationale(
-    shift: dict,
-    range_entry: dict | None,
+    shift: typing.Mapping[str, typing.Any],
+    range_entry: typing.Mapping[str, typing.Any] | None,
     trips: int | None,
     default_minutes: int,
     last_shift_remains: int = 0,
 ) -> str:
     """Return a human-readable string explaining how the duration was calculated."""
     if trips:
-        merged = {**shift, **(range_entry or {})}
+        merged = {**dict(shift), **(range_entry or {})}
         trip_duration = merged.get("trip_duration")
         if trip_duration is not None:
             trip_duration = int(trip_duration)
@@ -130,6 +211,17 @@ def get_duration_rationale(
                 rationale += f"+{last_shift_remains}min"
             return rationale
     return f"{default_minutes}min (default)"
+
+
+def format_time_line(time_str: str, text: str, t: gettext.NullTranslations) -> str:
+    """Format a single description line containing time and text.
+
+    The default message id is ``"{time} {text}"``; translators can modify the
+    pattern (e.g. ``"{time} - {text}"``).  The *text* argument is passed
+    verbatim so source strings should use proper English casing.
+    """
+    pattern = t.gettext("{time} {text}")
+    return pattern.format(time=time_str, text=text)
 
 
 def build_program(
@@ -147,20 +239,32 @@ def build_program(
     lines: list[str] = []
     if advance > 0:
         prep_time = (base - timedelta(minutes=advance)).strftime("%H:%M")
-        lines.append(f"{prep_time} {t.gettext('preparation')}")
+        lines.append(format_time_line(prep_time, t.gettext("Preparation"), t))
     current = base
     for i in range(1, trips + 1):
-        lines.append(f"{current.strftime('%H:%M')} {t.gettext('trip {n}').format(n=i)}")
+        lines.append(
+            format_time_line(
+                current.strftime("%H:%M"),
+                t.gettext("Trip {n}").format(n=i),
+                t,
+            )
+        )
         trip_end = current + timedelta(minutes=trip_duration)
         if i < trips:
-            lines.append(f"{trip_end.strftime('%H:%M')} {t.gettext('break {n}').format(n=i)}")
+            lines.append(
+                format_time_line(
+                    trip_end.strftime("%H:%M"),
+                    t.gettext("Break {n}").format(n=i),
+                    t,
+                )
+            )
             current = trip_end + timedelta(minutes=break_duration)
         else:
             current = trip_end
     if remains > 0:
         actual_end = (current + timedelta(minutes=remains)).strftime("%H:%M")
         after_msg = t.gettext("aftercare \u2192 {time}").format(time=actual_end)
-        lines.append(f"{current.strftime('%H:%M')} {after_msg}")
+        lines.append(format_time_line(current.strftime("%H:%M"), after_msg, t))
     return "\n".join(lines)
 
 
@@ -261,7 +365,7 @@ def iter_events(
     ws,
     duration_hours: float = DEFAULT_DURATION_HOURS,
     advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
-    shift_types: dict[str, dict] | None = None,
+    shift_types: typing.Mapping[str, typing.Mapping[str, typing.Any]] | None = None,
     locale: str = DEFAULT_LOCALE,
     timezone: str = DEFAULT_TIMEZONE,
 ) -> Iterator[tuple[str, Event]]:
@@ -324,11 +428,15 @@ def iter_events(
                 )
             else:
                 trip_word = t.ngettext("trip", "trips", trips)
-                description += f"Start {hour:02d}:{minute:02d}"
+                description += format_time_line(
+                    f"{hour:02d}:{minute:02d}",
+                    t.gettext("Start"),
+                    t,
+                )
                 description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
                 description += f"\n{trips} {trip_word}"
         else:
-            description += f"Start {hour:02d}:{minute:02d}"
+            description += format_time_line(f"{hour:02d}:{minute:02d}", t.gettext("Start"), t)
             description += "\n" + t.gettext("- {n}m in advance").format(n=advance)
 
         dt_appt = datetime(
@@ -372,22 +480,39 @@ def main():
         metavar="HOURS",
         help=f"Duration of each appointment in hours (default: {DEFAULT_DURATION_HOURS})",
     )
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        default=CONFIG_DEFAULT_PATH,
+        help="Path to YAML config file (default: config.yaml)",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path.resolve()}")
 
-    print(f"Reading {input_path} …")
-    wb = openpyxl.load_workbook(input_path)
-    ws = wb.active
-    print(f"Sheet: {ws.title}\n")
+    # we'll print these after initializing the translator once locale is known
 
     ics_path = input_path.with_suffix(".ics")
-    config = load_config()
-    shift_types = config.get("shift_type") or {}
-    timezone = config.get("timezone", DEFAULT_TIMEZONE)
-    locale = config.get("locale", DEFAULT_LOCALE)
+    config = load_config(args.config)
+    # validate early so the CLI fails fast with a helpful message
+    validate_config(config, args.config)
+
+    # config validation ensures these keys exist and have proper types
+    typed_config: ConfigDict = typing.cast(ConfigDict, config)
+    shift_types = typed_config["shift_type"]
+    timezone = typed_config["timezone"]
+    locale = typed_config["locale"]
+
+    # now locale known, create translator and emit initial messages
+    t = setup_locale(locale)
+    print(t.gettext("Reading {path} …").format(path=input_path))
+    wb = openpyxl.load_workbook(input_path)
+    ws = wb.active
+    print(t.gettext("Sheet: {name}\n").format(name=ws.title))
+
     cal = make_calendar(input_path.stem)
     count = 0
     for label, event in iter_events(
@@ -399,11 +524,12 @@ def main():
     ):
         cal.add_component(event)
         count += 1
-        print(f"  + {label}")
+        # the label itself is already translated where appropriate
+        print(t.gettext("  + {label}").format(label=label))
 
     ics_path.write_bytes(cal.to_ical())
-    print(f"\nTotal events written: {count}")
-    print(f"Written to {ics_path.resolve()}")
+    print(t.gettext("\nTotal events written: {count}").format(count=count))
+    print(t.gettext("Written to {path}").format(path=ics_path.resolve()))
 
 
 if __name__ == "__main__":  # pragma: no cover

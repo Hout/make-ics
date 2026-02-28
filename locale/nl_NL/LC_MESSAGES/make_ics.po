@@ -8,6 +8,24 @@ msgstr ""
 msgid "and"
 msgstr "en"
 
+msgid "{time} {text}"
+msgstr "{time} - {text}"
+
+msgid "Reading {path} …"
+msgstr "Lees {path} …"
+
+msgid "Sheet: {name}\n"
+msgstr "Sheet: {name}\n"
+
+msgid "\nTotal events written: {count}"
+msgstr "\nTotaal diensten geschreven: {count}"
+
+msgid "Written to {path}"
+msgstr "Geschreven naar {path}"
+
+msgid "  + {label}"
+msgstr "  + {label}"
+
 msgid "trip"
 msgid_plural "trips"
 msgstr[0] "tocht"
@@ -16,14 +34,17 @@ msgstr[1] "tochten"
 msgid "- {n}m in advance"
 msgstr "- {n}m van tevoren"
 
-msgid "preparation"
-msgstr "voorbereiding"
+msgid "Preparation"
+msgstr "Voorbereiding"
 
-msgid "trip {n}"
-msgstr "tocht {n}"
+msgid "Start"
+msgstr "Start"
 
-msgid "break {n}"
-msgstr "pauze {n}"
+msgid "Trip {n}"
+msgstr "Tocht {n}"
+
+msgid "Break {n}"
+msgstr "Pauze {n}"
 
 msgid "aftercare → {time}"
 msgstr "nazorg → {time}"

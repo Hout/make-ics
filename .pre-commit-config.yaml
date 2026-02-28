@@ -22,9 +22,9 @@ repos:
         types: [python]
         pass_filenames: false
 
-      - id: pytest
-        name: pytest
-        entry: .venv/bin/pytest
+      - id: coverage
+        name: pytest (with coverage)
+        entry: .venv/bin/pytest --cov=make_ics --cov-fail-under=90
         language: system
         always_run: true
         pass_filenames: false

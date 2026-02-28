@@ -13,12 +13,14 @@ from unittest.mock import MagicMock
 
 import pytest
 from icalendar import Event
+from openpyxl import Workbook
 
 from make_ics import (
     DEFAULT_ADVANCE_MINUTES,
     build_program,
     build_trip_times,
     find_date_range,
+    format_time_line,
     format_trip_schedule,
     get_duration_rationale,
     get_last_shift_remains,
@@ -32,6 +34,7 @@ from make_ics import (
     parse_dutch_date,
     parse_time,
     setup_locale,
+    validate_config,
 )
 
 # ---------------------------------------------------------------------------
@@ -456,24 +459,110 @@ def test_last_shift_remains_zero_when_not_configured():
 
 
 # ---------------------------------------------------------------------------
-# load_config
+# load_config / validate_config
 # ---------------------------------------------------------------------------
 
 
-def test_load_config_returns_empty_dict_when_file_missing(monkeypatch, tmp_path):
-    import make_ics
-
-    monkeypatch.setattr(make_ics, "TRANSLATIONS_FILE", tmp_path / "nonexistent.yaml")
-    assert load_config() == {}
+def test_load_config_returns_empty_dict_when_file_missing(tmp_path):
+    assert load_config(tmp_path / "nonexistent.yaml") == {}
 
 
-def test_load_config_returns_empty_dict_when_file_is_empty(monkeypatch, tmp_path):
-    import make_ics
-
+def test_load_config_returns_empty_dict_when_file_is_empty(tmp_path):
     empty = tmp_path / "config.yaml"
     empty.write_text("")
-    monkeypatch.setattr(make_ics, "TRANSLATIONS_FILE", empty)
-    assert load_config() == {}
+    assert load_config(empty) == {}
+
+
+def test_validate_config_missing_keys(tmp_path):
+    cfg = {}
+    path = tmp_path / "cfg.yaml"
+    path.write_text("")
+    with pytest.raises(SystemExit, match="missing required key"):
+        validate_config(cfg, path)
+
+
+def test_validate_config_invalid_timezone(tmp_path):
+    cfg = {"timezone": "Not/A/Zone", "locale": "nl_NL", "shift_type": {"A": {}}}
+    path = tmp_path / "cfg.yaml"
+    with pytest.raises(SystemExit, match="invalid timezone"):
+        validate_config(cfg, path)
+
+
+def test_validate_config_invalid_locale(tmp_path):
+    cfg = {"timezone": "Europe/Amsterdam", "locale": "", "shift_type": {"A": {}}}
+    path = tmp_path / "cfg.yaml"
+    with pytest.raises(SystemExit, match="invalid locale"):
+        validate_config(cfg, path)
+
+
+def test_validate_config_invalid_shift_type(tmp_path):
+    cfg = {"timezone": "Europe/Amsterdam", "locale": "nl_NL.UTF-8", "shift_type": {}}
+    path = tmp_path / "cfg.yaml"
+    with pytest.raises(SystemExit, match="shift_type"):
+        validate_config(cfg, path)
+
+
+# helper used by several main() tests
+
+
+def _write_simple_workbook(path: Path) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["03-apr-26", "A", "10:00 uur"])
+    wb.save(path)
+
+
+def test_main_accepts_custom_config(monkeypatch, tmp_path):
+    xlsx = tmp_path / "input.xlsx"
+    _write_simple_workbook(xlsx)
+
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("timezone: Europe/Amsterdam\nlocale: nl_NL.UTF-8\nshift_type:\n  A: {}\n")
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-c", str(cfg)])
+    main()
+    assert (tmp_path / "input.ics").exists()
+
+
+def test_main_localises_messages(monkeypatch, tmp_path, capsys):
+    xlsx = tmp_path / "input.xlsx"
+    _write_simple_workbook(xlsx)
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("timezone: Europe/Amsterdam\nlocale: nl_NL\nshift_type:\n  A: {}\n")
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-c", str(cfg)])
+    main()
+    out = capsys.readouterr().out
+    assert "Lezen" in out
+    assert "Blad:" in out
+    assert "Totaal" in out
+
+
+def test_main_english_messages(monkeypatch, tmp_path, capsys):
+    xlsx = tmp_path / "input.xlsx"
+    _write_simple_workbook(xlsx)
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("timezone: Europe/Amsterdam\nlocale: en_GB\nshift_type:\n  A: {}\n")
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-c", str(cfg)])
+    main()
+    out = capsys.readouterr().out
+    assert "Reading" in out
+    assert "Sheet:" in out
+    assert "Total events written" in out
+
+
+def test_main_exits_on_bad_config(monkeypatch, tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["03-apr-26", "A", "10:00 uur"])
+    xlsx = tmp_path / "input.xlsx"
+    wb.save(xlsx)
+
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("locale: nl_NL")
+    monkeypatch.setattr("sys.argv", ["make_ics.py", str(xlsx), "-c", str(cfg)])
+    with pytest.raises(SystemExit):
+        main()
 
 
 # ---------------------------------------------------------------------------
@@ -750,12 +839,12 @@ def test_iter_events_description_includes_trip_schedule():
     assert events
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "09:30 preparation" in desc
-    assert "10:00 trip 1" in desc
-    assert "10:50 break 1" in desc
-    assert "11:20 trip 2" in desc
-    assert "12:10 break 2" in desc
-    assert "12:40 trip 3" in desc
+    assert "09:30 Preparation" in desc
+    assert "10:00 Trip 1" in desc
+    assert "10:50 Break 1" in desc
+    assert "11:20 Trip 2" in desc
+    assert "12:10 Break 2" in desc
+    assert "12:40 Trip 3" in desc
 
 
 def test_iter_events_description_no_trip_schedule_when_no_trip_duration():
@@ -774,7 +863,8 @@ def test_iter_events_description_no_trip_schedule_when_no_trip_duration():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "Start 10:00" in desc
+    # format_time_line places time before text
+    assert "10:00 Start" in desc
     assert re.search(r"\d{2}:\d{2}-\d{2}:\d{2}", desc) is None
 
 
@@ -790,7 +880,7 @@ def test_iter_events_description_arrive_singular():
     _, event = events[0]
     desc = str(event.get("description"))
     assert "- 1m in advance" in desc
-    assert "preparation" not in desc
+    assert "Preparation" not in desc
 
 
 # ---------------------------------------------------------------------------
@@ -849,7 +939,7 @@ def test_iter_events_description_nl_NL_arrive():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "Start 10:00" in desc
+    assert "10:00 - Start" in desc
     assert "- 30m van tevoren" in desc
     assert "arrive" not in desc
 
@@ -872,10 +962,10 @@ def test_iter_events_description_nl_NL_trip_schedule():
     )
     _, event = events[0]
     desc = str(event.get("description"))
-    assert "09:30 voorbereiding" in desc
-    assert "10:00 tocht 1" in desc
-    assert "10:50 pauze 1" in desc
-    assert "12:40 tocht 3" in desc
+    assert "09:30 - Voorbereiding" in desc
+    assert "10:00 - Tocht 1" in desc
+    assert "10:50 - Pauze 1" in desc
+    assert "12:40 - Tocht 3" in desc
 
 
 def test_iter_events_description_nl_NL_singular_minuut():
@@ -917,9 +1007,9 @@ def test_description_appends_remains_after_trip_schedule():
     _, event = events[0]
     desc = str(event.get("description"))
     # last trip ends 14:00 + 3x50 + 2x30 = 14:00 + 210min = 17:30; +30min → 18:00
-    assert "13:30 preparation" in desc
-    assert "14:00 trip 1" in desc
-    assert "16:40 trip 3" in desc
+    assert "13:30 Preparation" in desc
+    assert "14:00 Trip 1" in desc
+    assert "16:40 Trip 3" in desc
     assert "17:30 aftercare → 18:00" in desc
 
 
@@ -971,6 +1061,23 @@ def test_description_no_remains_suffix_on_non_last_shift():
 
 
 # ---------------------------------------------------------------------------
+# format_time_line helper
+# ---------------------------------------------------------------------------
+
+
+def test_format_time_line_default_pattern():
+    t = setup_locale("en_GB")
+    assert format_time_line("09:00", "Preparation", t) == "09:00 Preparation"
+
+
+def test_format_time_line_translated_pattern():
+    # simulate Dutch translation pattern
+    t = setup_locale("nl_NL")
+    # pattern in nl_NL.po is '{time} - {text}'
+    assert format_time_line("09:00", "Voorbereiding", t) == "09:00 - Voorbereiding"
+
+
+# ---------------------------------------------------------------------------
 # build_program
 # ---------------------------------------------------------------------------
 
@@ -979,37 +1086,37 @@ def test_build_program_three_trips_with_advance_and_remains():
     t = setup_locale("en_GB")
     result = build_program(14, 0, 30, 3, 50, 30, 30, t)
     lines = result.split("\n")
-    assert lines[0] == "13:30 preparation"
-    assert lines[1] == "14:00 trip 1"
-    assert lines[2] == "14:50 break 1"
-    assert lines[3] == "15:20 trip 2"
-    assert lines[4] == "16:10 break 2"
-    assert lines[5] == "16:40 trip 3"
+    assert lines[0] == "13:30 Preparation"
+    assert lines[1] == "14:00 Trip 1"
+    assert lines[2] == "14:50 Break 1"
+    assert lines[3] == "15:20 Trip 2"
+    assert lines[4] == "16:10 Break 2"
+    assert lines[5] == "16:40 Trip 3"
     assert lines[6] == "17:30 aftercare → 18:00"
 
 
 def test_build_program_single_trip_no_remains_no_breaks_shown():
     t = setup_locale("en_GB")
     result = build_program(10, 0, 30, 1, 50, 30, 0, t)
-    assert result == "09:30 preparation\n10:00 trip 1"
+    assert result == "09:30 Preparation\n10:00 Trip 1"
 
 
 def test_build_program_no_advance_skips_preparation():
     t = setup_locale("en_GB")
     result = build_program(10, 0, 0, 2, 50, 30, 0, t)
-    assert result.startswith("10:00 trip 1")
-    assert "preparation" not in result
+    assert result.startswith("10:00 Trip 1")
+    assert "Preparation" not in result
 
 
 def test_build_program_nl_NL():
     t = setup_locale("nl_NL")
     result = build_program(14, 0, 30, 2, 50, 30, 30, t)
     lines = result.split("\n")
-    assert lines[0] == "13:30 voorbereiding"
-    assert lines[1] == "14:00 tocht 1"
-    assert lines[2] == "14:50 pauze 1"
-    assert lines[3] == "15:20 tocht 2"
-    assert lines[4] == "16:10 nazorg → 16:40"
+    assert lines[0] == "13:30 - Voorbereiding"
+    assert lines[1] == "14:00 - Tocht 1"
+    assert lines[2] == "14:50 - Pauze 1"
+    assert lines[3] == "15:20 - Tocht 2"
+    assert lines[4] == "16:10 - nazorg → 16:40"
 
 
 def test_build_program_no_remains_no_aftercare():
