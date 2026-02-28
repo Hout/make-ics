@@ -1,6 +1,13 @@
 repos:
   - repo: local
     hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: scripts/go-fmt-stage.sh
+        language: script
+        types: [go]
+        pass_filenames: true
+
       - id: go-build
         name: go build
         entry: go build ./...

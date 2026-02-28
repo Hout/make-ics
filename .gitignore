@@ -1,6 +1,6 @@
 # Go
-make-ics
-make-ics.exe
+/make-ics
+/make-ics.exe
 coverage.out
 
 # Inputs / outputs
