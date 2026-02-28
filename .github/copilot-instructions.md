@@ -8,7 +8,7 @@ CLI tool (`make_ics.py`) that converts a Dutch xlsx schedule (`report.xlsx`) to 
 - **Version**: Python 3.12 (type hints accordingly — use `X | Y` unions, `list[X]`, `dict[K, V]`, etc.; no `Optional`, no `Union`)
 - **Line length**: 100 characters
 - **Formatter**: ruff (`ruff format`)
-- **Linter**: ruff with rule sets E, W, F, I, UP, B, SIM, RUF — always lint-clean; prefer auto-fixable patterns
+- **Linter**: ruff with rule sets E, W, F, I, UP, B, C, SIM, RUF — always lint-clean; prefer auto-fixable patterns; cyclomatic complexity must stay below 10 (C901)
 - **Type checker**: ty (`ty check`) — all code must pass without errors
 
 ## Code Style

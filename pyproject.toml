@@ -10,9 +10,13 @@ select = [
     "I",   # isort
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
+    "C",   # mccabe complexity
     "SIM", # flake8-simplify
     "RUF", # ruff-specific
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ty.environment]
 python-version = "3.12"

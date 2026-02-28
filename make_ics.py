@@ -153,14 +153,8 @@ def make_calendar(name: str) -> Calendar:
     return cal
 
 
-def iter_events(
-    ws,
-    duration_hours: float = DEFAULT_DURATION_HOURS,
-    advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
-    shift_types: dict[str, dict] | None = None,
-) -> Iterator[tuple[str, Event]]:
-    """Yield (label, Event) for each appointment row in the worksheet."""
-    # Pre-collect all parseable rows so we can identify first/last per (code, date).
+def _collect_rows(ws) -> list[tuple[str, date, int, int]]:
+    """Parse all appointment rows from the worksheet, skipping non-data and bad rows."""
     parsed_rows: list[tuple[str, date, int, int]] = []
     for row in ws.iter_rows(values_only=True):
         if not is_data_row(row):
@@ -174,6 +168,17 @@ def iter_events(
             print(f"  [SKIP] Could not parse row {row}: {exc}")
             continue
         parsed_rows.append((code, appt_date, hour, minute))
+    return parsed_rows
+
+
+def iter_events(
+    ws,
+    duration_hours: float = DEFAULT_DURATION_HOURS,
+    advance_minutes: int = DEFAULT_ADVANCE_MINUTES,
+    shift_types: dict[str, dict] | None = None,
+) -> Iterator[tuple[str, Event]]:
+    """Yield (label, Event) for each appointment row in the worksheet."""
+    parsed_rows = _collect_rows(ws)
 
     # Build maps: first and last row index per (code, date).
     first_idx: dict[tuple[str, date], int] = {}
