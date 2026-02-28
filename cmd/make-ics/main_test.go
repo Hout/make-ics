@@ -30,15 +30,12 @@ func TestRun_CreatesIcsAndLocalises(t *testing.T) {
 		t.Fatalf("write cfg: %v", err)
 	}
 
-	// locales dir is ../../locales relative to cmd/make-ics (go test cwd = package dir)
-	localesDir := filepath.Join("..", "..", "locales")
-
 	// capture stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	runErr := Run([]string{"-c", cfg, xlsx}, localesDir)
+	runErr := Run([]string{"-c", cfg, xlsx})
 	w.Close()
 	outBytes, _ := io.ReadAll(r)
 	os.Stdout = old
@@ -66,7 +63,7 @@ func TestRun_ExitsOnBadConfig(t *testing.T) {
 	if err := os.WriteFile(cfg, []byte("locale: nl_NL\n"), 0o644); err != nil {
 		t.Fatalf("write cfg: %v", err)
 	}
-	if err := Run([]string{"-c", cfg, xlsx}, filepath.Join("..", "..", "locales")); err == nil {
+	if err := Run([]string{"-c", cfg, xlsx}); err == nil {
 		t.Fatalf("expected error for invalid config")
 	}
 }

@@ -28,7 +28,7 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	st := model.ShiftType{Summary: "A Shift", FirstShiftAdv: &adv, LastShiftRem: &rem}
 	shifts := map[string]model.ShiftType{"A": st}
 
-	loc, _ := i18n.NewLocalizer("locales", "nl")
+	loc, _ := i18n.NewLocalizer("nl")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -63,7 +63,7 @@ func TestIterEvents_CodeTrimsWhitespace(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00 uur")
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "Binnendieze HRM"}}
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -86,7 +86,7 @@ func TestIterEvents_SkipsNonDataRows(t *testing.T) {
 	f.SetCellValue(sheet, "B2", "HRm_")
 	f.SetCellValue(sheet, "C2", "14:40 uur")
 
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -103,7 +103,7 @@ func TestIterEvents_SkipsRowWithUnparseableTime(t *testing.T) {
 	f.SetCellValue(s, "B1", "HRm_")
 	f.SetCellValue(s, "C1", "geen-tijd")
 
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -120,7 +120,7 @@ func TestIterEvents_AfspraakFallback(t *testing.T) {
 	f.SetCellValue(s, "B1", "")
 	f.SetCellValue(s, "C1", "10:00 uur")
 
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -138,7 +138,7 @@ func TestIterEvents_ShiftDescriptionAppended(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00 uur")
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "HRM", Description: "Some route detail"}}
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
@@ -158,7 +158,7 @@ func TestIterEvents_EventDatetimesTimezoneAware(t *testing.T) {
 	f.SetCellValue(s, "B1", "HRm_")
 	f.SetCellValue(s, "C1", "14:40 uur")
 
-	loc, _ := i18n.NewLocalizer("locales", "en")
+	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)

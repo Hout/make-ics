@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,9 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/pipeline"
 )
 
+//go:embed config.yaml
+var embeddedConfig []byte
+
 const defaultAdvanceMinutes = 30
 
 func main() {
@@ -25,17 +29,11 @@ func main() {
 }
 
 // Run executes the command using the provided args (excluding program name).
-// localesDir is the directory containing *.json i18n bundles; pass "" to use
-// the default "locales" path relative to cwd.
 // It returns an error instead of calling os.Exit so tests can call it safely.
-func Run(args []string, localesDir ...string) error {
-	dir := "locales"
-	if len(localesDir) > 0 && localesDir[0] != "" {
-		dir = localesDir[0]
-	}
+func Run(args []string) error {
 	fs := flag.NewFlagSet("make-ics", flag.ContinueOnError)
 	input := fs.String("input", "report.xlsx", "Path to the input xlsx file")
-	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
+	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file (uses compiled-in default if not found)")
 	// -c is an alias for -config; both write to the same pointer so the last one wins.
 	fs.StringVar(cfgPath, "c", *cfgPath, "Path to YAML config file (alias)")
 	if err := fs.Parse(args); err != nil {
@@ -46,17 +44,23 @@ func Run(args []string, localesDir ...string) error {
 		*input = fs.Arg(0)
 	}
 
-	// load config
+	// load config: try external file, fall back to embedded default
 	cfg, err := config.LoadConfig(*cfgPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
+	}
+	if config.IsEmpty(cfg) {
+		cfg, err = config.LoadConfigFromBytes(embeddedConfig)
+		if err != nil {
+			return fmt.Errorf("failed to load embedded config: %w", err)
+		}
 	}
 	if err := config.ValidateConfig(cfg, *cfgPath); err != nil {
 		return err
 	}
 
-	// i18n
-	loc, err := i18n.NewLocalizer(dir, cfg.Locale)
+	// i18n — always uses the locales embedded in the binary
+	loc, err := i18n.NewLocalizer(cfg.Locale)
 	if err != nil {
 		return fmt.Errorf("failed to initialize i18n: %w", err)
 	}

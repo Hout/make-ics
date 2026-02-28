@@ -78,7 +78,7 @@ var buildProgramCases = []struct {
 }
 
 func TestBuildProgram_English(t *testing.T) {
-	loc, err := i18n.NewLocalizer("../../locales", "en")
+	loc, err := i18n.NewLocalizer("en")
 	if err != nil {
 		t.Fatalf("failed to load English localizer: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestBuildProgram_English(t *testing.T) {
 }
 
 func TestBuildProgram_Dutch(t *testing.T) {
-	loc, err := i18n.NewLocalizer("../../locales", "nl_NL")
+	loc, err := i18n.NewLocalizer("nl_NL")
 	if err != nil {
 		t.Fatalf("failed to load Dutch localizer: %v", err)
 	}
