@@ -3,6 +3,7 @@ package schedule
 import (
     "fmt"
     "strings"
+    "time"
 
     "github.com/jeroen/make-ics-go/pkg/model"
     dr "github.com/jeroen/make-ics-go/pkg/range"
@@ -136,68 +137,44 @@ func FormatTripSchedule(tripTimes []struct{ Start, End string }, t Translator) s
     return fmt.Sprintf("%d %s: %s %s %s", n, tripWord, strings.Join(segments[:n-1], ", "), andWord, segments[n-1])
 }
 
-func max(a, b int) int { if a > b { return a }; return b }
-
 // BuildProgram returns a multi-line program like the Python original.
 func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int, breakDuration int, remains int, t Translator) string {
-    // Use a base date to compute times
-    baseHour := hour
-    baseMin := minute
-    lines := []string{}
+    base := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
+    var lines []string
     if advance > 0 {
-        prepMin := baseMin - advance
-        ph := baseHour + (prepMin/60)
-        pm := prepMin % 60
-        if pm < 0 {
-            ph -= 1
-            pm += 60
-        }
-        prepTime := fmt.Sprintf("%02d:%02d", ph, pm)
+        prep := base.Add(-time.Duration(advance) * time.Minute)
         prepLabel := "Preparation"
         if t != nil {
             prepLabel = t.T("Preparation", nil)
         }
-        lines = append(lines, fmt.Sprintf("%s %s", prepTime, prepLabel))
+        lines = append(lines, fmt.Sprintf("%02d:%02d %s", prep.Hour(), prep.Minute(), prepLabel))
     }
-    // iterate trips
-    curH := baseHour
-    curM := baseMin
+    cur := base
     for i := 1; i <= trips; i++ {
-        timeStr := fmt.Sprintf("%02d:%02d", curH, curM)
         tripLabel := fmt.Sprintf("Trip %d", i)
         if t != nil {
             tripLabel = t.T("Trip", map[string]interface{}{"n": i})
         }
-        lines = append(lines, fmt.Sprintf("%s %s", timeStr, tripLabel))
-        // trip end
-        endTotal := curH*60 + curM + tripDuration
-        endH := endTotal / 60
-        endM := endTotal % 60
+        lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), tripLabel))
+        end := cur.Add(time.Duration(tripDuration) * time.Minute)
         if i < trips {
-            // break line
             breakLabel := fmt.Sprintf("Break %d", i)
             if t != nil {
                 breakLabel = t.T("Break", map[string]interface{}{"n": i})
             }
-            lines = append(lines, fmt.Sprintf("%02d:%02d %s", endH, endM, breakLabel))
-            // advance current by tripDuration + breakDuration
-            nextTotal := endTotal + breakDuration
-            curH = nextTotal / 60
-            curM = nextTotal % 60
+            lines = append(lines, fmt.Sprintf("%02d:%02d %s", end.Hour(), end.Minute(), breakLabel))
+            cur = end.Add(time.Duration(breakDuration) * time.Minute)
         } else {
-            curH = endH
-            curM = endM
+            cur = end
         }
     }
     if remains > 0 {
-        actualEndTotal := curH*60 + curM + remains
-        ah := actualEndTotal / 60
-        am := actualEndTotal % 60
-        afterMsg := fmt.Sprintf("aftercare → %02d:%02d", ah, am)
+        afterEnd := cur.Add(time.Duration(remains) * time.Minute)
+        afterMsg := fmt.Sprintf("aftercare \u2192 %02d:%02d", afterEnd.Hour(), afterEnd.Minute())
         if t != nil {
-            afterMsg = t.T("aftercare", map[string]interface{}{"time": fmt.Sprintf("%02d:%02d", ah, am)})
+            afterMsg = t.T("aftercare", map[string]interface{}{"time": fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())})
         }
-        lines = append(lines, fmt.Sprintf("%02d:%02d %s", curH, curM, afterMsg))
+        lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), afterMsg))
     }
     return strings.Join(lines, "\n")
 }

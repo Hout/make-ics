@@ -14,7 +14,7 @@ import (
     "github.com/jeroen/make-ics-go/pkg/pipeline"
 )
 
-const DEFAULT_ADVANCE_MINUTES = 30
+const defaultAdvanceMinutes = 30
 
 func main() {
     // delegate to Run for testability
@@ -36,7 +36,7 @@ func Run(args []string, localesDir ...string) error {
     fs := flag.NewFlagSet("make-ics", flag.ContinueOnError)
     input := fs.String("input", "report.xlsx", "Path to the input xlsx file")
     cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
-    // short aliases
+    // -c is an alias for -config; both write to the same pointer so the last one wins.
     fs.StringVar(cfgPath, "c", *cfgPath, "Path to YAML config file (alias)")
     if err := fs.Parse(args); err != nil {
         return err
@@ -69,7 +69,7 @@ func Run(args []string, localesDir ...string) error {
     }
     defer wb.Close()
 
-    events, err := pipeline.IterEvents(wb, DEFAULT_ADVANCE_MINUTES, cfg.Timezone, cfg.ShiftType, loc)
+    events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, loc)
     if err != nil {
         return fmt.Errorf("Failed to build events: %w", err)
     }

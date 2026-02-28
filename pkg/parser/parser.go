@@ -8,13 +8,18 @@ import (
 	"time"
 )
 
+var (
+	dutchDateRE = regexp.MustCompile(`(?i)^(\d{2})-([A-Za-z]{3})-(\d{2})$`)
+	timeRE      = regexp.MustCompile(`^(\d{1,2}):(\d{2})`)
+	dataRowRE   = regexp.MustCompile(`^\d{2}-[A-Za-z]{3}-\d{2}$`)
+)
+
 // ParseDutchDate parses a strict Dutch date in format DD-MMM-YY (e.g. 03-apr-26)
 // and returns a time.Time with date fields set (hour/min/sec/nsec zero) in UTC.
 // Two-digit year is interpreted as 2000 + yy.
 func ParseDutchDate(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
-	re := regexp.MustCompile(`(?i)^(\d{2})-([A-Za-z]{3})-(\d{2})$`)
-	m := re.FindStringSubmatch(s)
+	m := dutchDateRE.FindStringSubmatch(s)
 	if m == nil {
 		return time.Time{}, fmt.Errorf("could not parse date: %q", s)
 	}
@@ -59,8 +64,7 @@ func ParseDutchDate(s string) (time.Time, error) {
 // ParseTime parses a time string like "14:40 uur" and returns hour, minute.
 func ParseTime(s string) (int, int, error) {
 	s = strings.TrimSpace(s)
-	re := regexp.MustCompile(`^(\d{1,2}):(\d{2})`)
-	m := re.FindStringSubmatch(s)
+	m := timeRE.FindStringSubmatch(s)
 	if m == nil {
 		return 0, 0, fmt.Errorf("unexpected time format: %q", s)
 	}
@@ -90,6 +94,5 @@ func IsDataRow(cells []string) bool {
 		return false
 	}
 	// must match dd-mon-yy
-	matched, _ := regexp.MatchString(`^\d{2}-[A-Za-z]{3}-\d{2}$`, dateVal)
-	return matched
+	return dataRowRE.MatchString(dateVal)
 }

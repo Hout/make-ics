@@ -11,6 +11,7 @@ func WriteCalendar(name string, events []pipeline.Event, path string) error {
     cal := ical.NewCalendar()
     cal.SetMethod(ical.MethodPublish)
     cal.SetProductId("-//make-ics//go//NL")
+    cal.SetXWRCalName(name)
     for _, e := range events {
         ev := cal.AddEvent(e.UID)
         ev.SetSummary(e.Summary)

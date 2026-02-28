@@ -1,7 +1,6 @@
 package i18n
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -44,8 +43,4 @@ func (l *Localizer) N(id string, pluralCount int, templateData map[string]interf
 	return msg
 }
 
-// Convenience wrapper for context-aware usage if needed
-func (l *Localizer) TWithCtx(ctx context.Context, id string, data map[string]interface{}) string {
-	_ = ctx
-	return l.T(id, data)
-}
+

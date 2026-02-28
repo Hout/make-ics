@@ -2,16 +2,17 @@ package pipeline
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 
-	"github.com/jeroen/make-ics-go/pkg/parser"
+	"github.com/jeroen/make-ics-go/pkg/i18n"
 	"github.com/jeroen/make-ics-go/pkg/model"
+	"github.com/jeroen/make-ics-go/pkg/parser"
 	dr "github.com/jeroen/make-ics-go/pkg/range"
 	"github.com/jeroen/make-ics-go/pkg/schedule"
-	"github.com/jeroen/make-ics-go/pkg/i18n"
 )
 
 type Event struct {
@@ -50,12 +51,12 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		}
 		tdate, err := parser.ParseDutchDate(dateStr)
 		if err != nil {
-			fmt.Printf("  [SKIP] Could not parse date %q: %v\n", dateStr, err)
+			fmt.Fprintf(os.Stderr, "  [SKIP] Could not parse date %q: %v\n", dateStr, err)
 			continue
 		}
 		h, m, err := parser.ParseTime(r[2])
 		if err != nil {
-			fmt.Printf("  [SKIP] Could not parse time %q: %v\n", r[2], err)
+			fmt.Fprintf(os.Stderr, "  [SKIP] Could not parse time %q: %v\n", r[2], err)
 			continue
 		}
 		parsed = append(parsed, struct{
@@ -89,7 +90,8 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		isFirst := firstIdx[key] == i
 		isLast := lastIdx[key] == i
 
-		// resolve shift type
+		// resolve shift type; unknown codes use a zero-value ShiftType (all pointer
+		// fields nil), which causes all helpers to return their safe defaults.
 		shift, hasShift := shiftTypes[p.Code]
 		startTime := fmt.Sprintf("%02d:%02d", p.Hour, p.Min)
 		rangeEntry := dr.FindDateRange(shift.DateRanges, p.Date, startTime)
