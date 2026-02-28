@@ -28,3 +28,10 @@ repos:
         language: system
         types: [go]
         pass_filenames: false
+
+      - id: go-build-binaries
+        name: go build binaries
+        entry: scripts/go-build-binaries.sh
+        language: script
+        types: [go]
+        pass_filenames: false
