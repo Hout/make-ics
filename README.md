@@ -4,16 +4,17 @@ Converts a Dutch xlsx schedule (`report.xlsx`) into an ICS calendar file.
 
 ## Usage
 
-```
+```text
 ./make-ics-macos [OPTIONS] [report.xlsx]
 ```
 
-| Option | Default | Description |
-|---|---|---|
+| Option          | Default       | Description              |
+| --------------- | ------------- | ------------------------ |
 | `-c`, `-config` | `config.yaml` | Path to YAML config file |
-| `-input` | `report.xlsx` | Path to input xlsx file |
+| `-input`        | `report.xlsx` | Path to input xlsx file  |
 
-The output file is written next to the input file with a `.ics` extension (e.g. `report.ics`).
+The output file is written next to the input file with a `.ics`
+extension (e.g. `report.ics`).
 
 ### Examples
 
@@ -27,7 +28,9 @@ The output file is written next to the input file with a `.ics` extension (e.g. 
 
 ## Config
 
-A default `config.yaml` is compiled into the binary and used automatically when no external config is found.  To override, place a `config.yaml` next to the binary or pass `-c <path>`.
+A default `config.yaml` is compiled into the binary and used
+automatically when no external config is found. To override, place a
+`config.yaml` next to the binary or pass `-c <path>`.
 
 ```yaml
 timezone: Europe/Amsterdam
@@ -53,22 +56,25 @@ shift_type:
 
 ### Shift type fields
 
-| Field | Description |
-|---|---|
-| `summary` | VEVENT `SUMMARY` (calendar title) |
-| `description` | Static text appended to the event description |
-| `trips` | Number of trips per shift (default 1) |
-| `trip_duration` | Duration of each trip in minutes (default 0) |
-| `break_duration` | Break between trips in minutes (default 0) |
+| Field                 | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `summary`             | VEVENT `SUMMARY` (calendar title)               |
+| `description`         | Static text appended to the event description   |
+| `trips`               | Number of trips per shift (default 1)           |
+| `trip_duration`       | Duration of each trip in minutes (default 0)    |
+| `break_duration`      | Break between trips in minutes (default 0)      |
 | `first_shift_advance` | Extra minutes before the first shift of the day |
-| `last_shift_remains` | Extra minutes after the last shift of the day |
-| `date_ranges` | Period-specific overrides (see below) |
+| `last_shift_remains`  | Extra minutes after the last shift of the day   |
+| `date_ranges`         | Period-specific overrides (see below)           |
 
-Duration formula: `trips × trip_duration + max(0, trips − 1) × break_duration`
+Duration formula:
+`trips × trip_duration + max(0, trips − 1) × break_duration`
 
 ### Date ranges
 
-Each entry under `date_ranges` applies when the shift date falls within `[from, to]` (inclusive).  Fields set inside a range override the top-level shift defaults for that period.
+Each entry under `date_ranges` applies when the shift date falls within
+`[from, to]` (inclusive). Fields set inside a range override the
+top-level shift defaults for that period.
 
 `start_times` groups start times by how many trips they use:
 
@@ -81,10 +87,10 @@ start_times:
 
 ## Binaries
 
-| File | Platform |
-|---|---|
+| File             | Platform                    |
+| ---------------- | --------------------------- |
 | `make-ics-macos` | macOS arm64 (Apple Silicon) |
-| `make-ics.exe` | Windows amd64 |
+| `make-ics.exe`   | Windows amd64               |
 
 ## Building from source
 
@@ -109,7 +115,8 @@ go test ./...   # run all tests
 go vet ./...    # static analysis
 ```
 
-Pre-commit hooks (go fmt, go build, go vet, go test, binary rebuild) run automatically on `git commit` after installing:
+Pre-commit hooks (go fmt, go build, go vet, go test, binary rebuild)
+run automatically on `git commit` after installing:
 
 ```bash
 pre-commit install
