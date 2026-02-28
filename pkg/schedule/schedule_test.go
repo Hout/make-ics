@@ -62,15 +62,15 @@ var buildProgramCases = []struct {
 	wantNL  string
 }{
 	{
-		name:    "1 trip",
-		hour:    14, minute: 40, advance: 30,
+		name: "1 trip",
+		hour: 14, minute: 40, advance: 30,
 		trips: 1, tripDur: 50, brkDur: 30, remains: 30,
 		wantEN: "14:10 - Preparation\n14:40 - Trip 1\n15:30 - aftercare → 16:00",
 		wantNL: "14:10 - Voorbereiding\n14:40 - Tocht 1\n15:30 - nazorg → 16:00",
 	},
 	{
-		name:    "3 trips",
-		hour:    11, minute: 0, advance: 30,
+		name: "3 trips",
+		hour: 11, minute: 0, advance: 30,
 		trips: 3, tripDur: 50, brkDur: 30, remains: 30,
 		wantEN: "10:30 - Preparation\n11:00 - Trip 1\n11:50 - Break 1\n12:20 - Trip 2\n13:10 - Break 2\n13:40 - Trip 3\n14:30 - aftercare → 15:00",
 		wantNL: "10:30 - Voorbereiding\n11:00 - Tocht 1\n11:50 - Pauze 1\n12:20 - Tocht 2\n13:10 - Pauze 2\n13:40 - Tocht 3\n14:30 - nazorg → 15:00",
