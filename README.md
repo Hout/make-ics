@@ -30,9 +30,9 @@ extension (e.g. `report.ics`).
 
 ## Config
 
-A default `config.yaml` is compiled into the binary and used
-automatically when no external config is found. To override, place a
-`config.yaml` next to the binary or pass `-c <path>`.
+No configuration is needed out of the box — a default `config.yaml`
+is compiled into the binary and used automatically. To override it,
+place a `config.yaml` next to the binary or pass `-c <path>`.
 
 ```yaml
 timezone: Europe/Amsterdam

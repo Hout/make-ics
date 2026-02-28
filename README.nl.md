@@ -31,8 +31,8 @@ extensie `.ics` (bijv. `report.ics`).
 
 ## Configuratie
 
-Een standaard `config.yaml` is ingebakken in het programma en wordt
-automatisch gebruikt als er geen extern bestand wordt gevonden. Om dit
+Standaard is er geen configuratie nodig — een standaard `config.yaml`
+is ingebakken in het programma en wordt automatisch gebruikt. Om dit
 te overschrijven, plaats je een `config.yaml` naast het programma of
 geef je `-c <pad>` op.
 
