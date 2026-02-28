@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,8 +47,8 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		}
 		dateStr := r[0]
 		code := "Afspraak"
-		if len(r) > 1 && r[1] != "" {
-			code = r[1]
+		if len(r) > 1 && strings.TrimSpace(r[1]) != "" {
+			code = strings.TrimSpace(r[1])
 		}
 		tdate, err := parser.ParseDutchDate(dateStr)
 		if err != nil {
@@ -154,8 +155,12 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		dtStart := dtAppt.Add(-time.Duration(advance) * time.Minute)
 		dtEnd := dtAppt.Add(time.Duration(durationMinutes) * time.Minute)
 
+		summary := p.Code
+		if hasShift && shift.Summary != "" {
+			summary = shift.Summary
+		}
 		ev := Event{
-			Summary:     p.Code,
+			Summary:     summary,
 			Description: description,
 			DtStart:     dtStart,
 			DtEnd:       dtEnd,

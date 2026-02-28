@@ -146,6 +146,16 @@ func FormatTripSchedule(tripTimes []struct{ Start, End string }, t Translator) s
 	return fmt.Sprintf("%d %s: %s %s %s", n, tripWord, strings.Join(segments[:n-1], ", "), andWord, segments[n-1])
 }
 
+// formatTimeLine assembles a single schedule line as "{time} - {label}" using
+// the "{time} {text}" i18n key. Falls back to a plain space separator when no
+// Translator is provided (e.g. in nil-translator unit tests).
+func formatTimeLine(timeStr, label string, t Translator) string {
+	if t == nil {
+		return timeStr + " " + label
+	}
+	return t.T("{time} {text}", map[string]any{"time": timeStr, "text": label})
+}
+
 // BuildProgram returns a multi-line program like the Python original.
 func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int, breakDuration int, remains int, t Translator) string {
 	base := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
@@ -156,22 +166,22 @@ func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int
 		if t != nil {
 			prepLabel = t.T("Preparation", nil)
 		}
-		lines = append(lines, fmt.Sprintf("%02d:%02d %s", prep.Hour(), prep.Minute(), prepLabel))
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", prep.Hour(), prep.Minute()), prepLabel, t))
 	}
 	cur := base
 	for i := 1; i <= trips; i++ {
 		tripLabel := fmt.Sprintf("Trip %d", i)
 		if t != nil {
-			tripLabel = t.T("Trip", map[string]any{"n": i})
+			tripLabel = t.T("Trip {n}", map[string]any{"n": i})
 		}
-		lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), tripLabel))
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()), tripLabel, t))
 		end := cur.Add(time.Duration(tripDuration) * time.Minute)
 		if i < trips {
 			breakLabel := fmt.Sprintf("Break %d", i)
 			if t != nil {
-				breakLabel = t.T("Break", map[string]any{"n": i})
+				breakLabel = t.T("Break {n}", map[string]any{"n": i})
 			}
-			lines = append(lines, fmt.Sprintf("%02d:%02d %s", end.Hour(), end.Minute(), breakLabel))
+			lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", end.Hour(), end.Minute()), breakLabel, t))
 			cur = end.Add(time.Duration(breakDuration) * time.Minute)
 		} else {
 			cur = end
@@ -179,11 +189,12 @@ func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int
 	}
 	if remains > 0 {
 		afterEnd := cur.Add(time.Duration(remains) * time.Minute)
-		afterMsg := fmt.Sprintf("aftercare \u2192 %02d:%02d", afterEnd.Hour(), afterEnd.Minute())
+		endStr := fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())
+		afterLabel := fmt.Sprintf("aftercare \u2192 %s", endStr)
 		if t != nil {
-			afterMsg = t.T("aftercare", map[string]any{"time": fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())})
+			afterLabel = t.T("aftercare \u2192 {time}", map[string]any{"time": endStr})
 		}
-		lines = append(lines, fmt.Sprintf("%02d:%02d %s", cur.Hour(), cur.Minute(), afterMsg))
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()), afterLabel, t))
 	}
 	return strings.Join(lines, "\n")
 }

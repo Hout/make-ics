@@ -42,12 +42,37 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	if !e1.DtStart.Equal(expectedStart) {
 		t.Fatalf("first event dtstart expected %v got %v", expectedStart, e1.DtStart)
 	}
+	// summary should come from the shift config, not the raw code
+	if e1.Summary != "A Shift" {
+		t.Fatalf("expected summary %q got %q", "A Shift", e1.Summary)
+	}
 	// last event end should include +30min
 	e2 := events[1]
 	// default duration 4h (240min) -> dtend = 12:00 + 240min + 30 = 16:30
 	expectedEnd := time.Date(2026, 4, 3, 12, 0, 0, 0, e2.DtEnd.Location()).Add(240*time.Minute + 30*time.Minute)
 	if !e2.DtEnd.Equal(expectedEnd) {
 		t.Fatalf("last event dtend expected %v got %v", expectedEnd, e2.DtEnd)
+	}
+}
+
+func TestIterEvents_CodeTrimsWhitespace(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "HRm_ ") // trailing space — must still match config
+	f.SetCellValue(s, "C1", "10:00 uur")
+
+	shifts := map[string]model.ShiftType{"HRm_": {Summary: "Binnendieze HRM"}}
+	loc, _ := i18n.NewLocalizer("locales", "en")
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event got %d", len(events))
+	}
+	if events[0].Summary != "Binnendieze HRM" {
+		t.Fatalf("expected summary %q got %q", "Binnendieze HRM", events[0].Summary)
 	}
 }
 
