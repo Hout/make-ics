@@ -4,6 +4,9 @@
 
 Converts a Dutch xlsx schedule (`report.xlsx`) into an ICS calendar file.
 
+> **Note:** The built-in configuration currently covers HRM shifts only.
+> Support for other shift types may be added later on request.
+
 ## Usage
 
 ```text

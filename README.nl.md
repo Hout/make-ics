@@ -5,6 +5,10 @@
 Zet een Nederlandse xlsx-dienstregelingexport (`report.xlsx`) om naar
 een ICS-kalenderbestand.
 
+> **Let op:** De ingebouwde configuratie dekt momenteel alleen
+> HRM-diensten. Ondersteuning voor andere dienstsoorten kan later
+> op verzoek worden toegevoegd.
+
 ## Gebruik
 
 ```text
