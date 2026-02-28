@@ -301,9 +301,6 @@ def iter_events(
             tr, range_entry, trips, int(duration_hours * 60)
         )
         remains = get_last_shift_remains(tr, range_entry) if is_last else 0
-        rationale = get_duration_rationale(
-            tr, range_entry, trips, int(duration_hours * 60), remains
-        )
         duration_minutes += remains
 
         description = f"{tr_description}\n" if tr_description else ""
@@ -344,10 +341,7 @@ def iter_events(
         event.add("dtstamp", datetime.now(tz=UTC))
         event["uid"] = str(uuid.uuid4())
 
-        label = (
-            f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
-            f"  (-{advance}min +{duration_minutes}min: {rationale})"
-        )
+        label = f"{appt_date} {hour:02d}:{minute:02d}  {summary}"
         yield label, event
 
 

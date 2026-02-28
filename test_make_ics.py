@@ -7,7 +7,7 @@ advance_minutes.
 """
 
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -91,11 +91,12 @@ def collect(
     )
 
 
-def advance_of(label: str) -> int:
-    """Extract advance minutes from a label like '... (-45min +195min)'."""
-    m = re.search(r"\(-(\d+)min", label)
-    assert m, f"No advance found in label: {label!r}"
-    return int(m.group(1))
+def advance_of(label: str, event: Event) -> int:
+    """Return advance minutes = appointment time - DTSTART."""
+    parts = label.split()
+    appt_dt = datetime.strptime(f"{parts[0]} {parts[1]}", "%Y-%m-%d %H:%M")
+    dtstart = event.decoded("dtstart")
+    return int((appt_dt - dtstart.replace(tzinfo=None)).total_seconds() / 60)
 
 
 # ---------------------------------------------------------------------------
@@ -287,9 +288,9 @@ def test_last_shift_remains_range_entry_overrides_shift():
 
 def test_first_shift_of_day_gets_range_advance():
     ws = make_ws(("03-apr-26", "HRm_", "10:00 uur"))
-    labels = [label for label, _ in collect(ws)]
-    assert len(labels) == 1
-    assert advance_of(labels[0]) == 45
+    pairs = list(collect(ws))
+    assert len(pairs) == 1
+    assert advance_of(*pairs[0]) == 45
 
 
 def test_second_shift_same_day_gets_default_advance():
@@ -298,9 +299,9 @@ def test_second_shift_same_day_gets_default_advance():
         ("03-apr-26", "HRm_", "10:00 uur"),
         ("03-apr-26", "HRm_", "14:40 uur"),
     )
-    labels = [label for label, _ in collect(ws, advance=30)]
-    assert advance_of(labels[0]) == 45  # first shift → range
-    assert advance_of(labels[1]) == 30  # second shift → CLI default
+    pairs = list(collect(ws, advance=30))
+    assert advance_of(*pairs[0]) == 45  # first shift → range
+    assert advance_of(*pairs[1]) == 30  # second shift → CLI default
 
 
 def test_first_shift_on_each_day_independently_gets_range_advance():
@@ -309,15 +310,15 @@ def test_first_shift_on_each_day_independently_gets_range_advance():
         ("03-apr-26", "HRm_", "10:00 uur"),
         ("04-apr-26", "HRm_", "11:00 uur"),
     )
-    labels = [label for label, _ in collect(ws)]
-    assert advance_of(labels[0]) == 45
-    assert advance_of(labels[1]) == 45
+    pairs = list(collect(ws))
+    assert advance_of(*pairs[0]) == 45
+    assert advance_of(*pairs[1]) == 45
 
 
 def test_date_outside_all_ranges_gets_default_advance():
     ws = make_ws(("03-jul-26", "HRm_", "10:00 uur"))
-    labels = [label for label, _ in collect(ws, advance=30)]
-    assert advance_of(labels[0]) == 30
+    pairs = list(collect(ws, advance=30))
+    assert advance_of(*pairs[0]) == 30
 
 
 def test_date_outside_all_ranges_uses_shift_level_first_shift_advance():
@@ -331,8 +332,8 @@ def test_date_outside_all_ranges_uses_shift_level_first_shift_advance():
         }
     }
     ws = make_ws(("03-jul-26", "HRm_", "10:00 uur"))
-    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
-    assert advance_of(labels[0]) == 25
+    pairs = list(iter_events(ws, advance_minutes=30, shift_types=shift_types))
+    assert advance_of(*pairs[0]) == 25
 
 
 def test_range_first_shift_advance_overrides_shift_level():
@@ -346,8 +347,8 @@ def test_range_first_shift_advance_overrides_shift_level():
         }
     }
     ws = make_ws(("03-apr-26", "HRm_", "10:00 uur"))
-    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
-    assert advance_of(labels[0]) == 45
+    pairs = list(iter_events(ws, advance_minutes=30, shift_types=shift_types))
+    assert advance_of(*pairs[0]) == 45
 
 
 def test_shift_level_first_shift_advance_not_applied_to_second_shift():
@@ -362,15 +363,15 @@ def test_shift_level_first_shift_advance_not_applied_to_second_shift():
         ("03-apr-26", "HRm_", "10:00 uur"),
         ("03-apr-26", "HRm_", "14:00 uur"),
     )
-    labels = [label for label, _ in iter_events(ws, advance_minutes=30, shift_types=shift_types)]
-    assert advance_of(labels[0]) == 25  # first shift → shift level
-    assert advance_of(labels[1]) == 30  # second shift → CLI default
+    pairs = list(iter_events(ws, advance_minutes=30, shift_types=shift_types))
+    assert advance_of(*pairs[0]) == 25  # first shift → shift level
+    assert advance_of(*pairs[1]) == 30  # second shift → CLI default
 
 
 def test_unknown_shift_code_gets_default_advance():
     ws = make_ws(("03-apr-26", "UNKNOWN", "10:00 uur"))
-    labels = [label for label, _ in collect(ws, advance=30)]
-    assert advance_of(labels[0]) == 30
+    pairs = list(collect(ws, advance=30))
+    assert advance_of(*pairs[0]) == 30
 
 
 def test_trip_override_applied_to_all_shifts_with_matching_start_time():
