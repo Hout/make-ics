@@ -287,7 +287,12 @@ def iter_events(
                 trip_times = build_trip_times(
                     hour, minute, trips, int(trip_duration), break_duration
                 )
-                description += f"\n{format_trip_schedule(trip_times, t)}"
+                schedule = format_trip_schedule(trip_times, t)
+                if remains:
+                    last_end_dt = datetime.strptime(trip_times[-1][1], "%H:%M")
+                    actual_end = (last_end_dt + timedelta(minutes=remains)).strftime("%H:%M")
+                    schedule += f" + {remains} min → {actual_end}"
+                description += f"\n{schedule}"
             else:
                 trip_word = t.ngettext("trip", "trips", trips)
                 description += f"\n{trips} {trip_word}"

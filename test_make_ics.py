@@ -882,3 +882,78 @@ def test_iter_events_description_nl_NL_singular_minuut():
     desc = str(event.get("description"))
     assert "1 minuut" in desc
     assert "minuten" not in desc
+
+
+# ---------------------------------------------------------------------------
+# Description — last_shift_remains suffix
+# ---------------------------------------------------------------------------
+
+
+def test_description_appends_remains_after_trip_schedule():
+    """When last_shift_remains > 0 on the last shift, the description shows the extra time."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 3,
+            "trip_duration": 50,
+            "break_duration": 30,
+            "last_shift_remains": 30,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRM", "14:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    # last trip ends 14:00 + 3x50 + 2x30 = 14:00 + 210min = 17:30; +30min → 18:00
+    assert "+ 30 min → 18:00" in desc
+
+
+def test_description_no_remains_suffix_when_zero():
+    """When last_shift_remains is 0 or absent, no suffix is added."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 2,
+            "trip_duration": 50,
+            "break_duration": 30,
+        }
+    }
+    ws = make_ws(("03-apr-26", "HRM", "10:00 uur"))
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    _, event = events[0]
+    desc = str(event.get("description"))
+    assert "→" not in desc
+
+
+def test_description_no_remains_suffix_on_non_last_shift():
+    """last_shift_remains is only added to the last shift of the day."""
+    shift_types_local = {
+        "HRM": {
+            "summary": "HRM",
+            "trips": 1,
+            "trip_duration": 50,
+            "break_duration": 0,
+            "last_shift_remains": 30,
+        }
+    }
+    ws = make_ws(
+        ("03-apr-26", "HRM", "10:00 uur"),
+        ("03-apr-26", "HRM", "14:00 uur"),
+    )
+    events = list(
+        iter_events(
+            ws, duration_hours=4, advance_minutes=30, shift_types=shift_types_local, locale="en_GB"
+        )
+    )
+    desc_first = str(events[0][1].get("description"))
+    desc_last = str(events[1][1].get("description"))
+    assert "→" not in desc_first
+    assert "+ 30 min → 15:20" in desc_last
