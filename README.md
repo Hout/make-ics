@@ -1,5 +1,7 @@
 # make-ics
 
+[🇳🇱 Nederlands](README.nl.md)
+
 Converts a Dutch xlsx schedule (`report.xlsx`) into an ICS calendar file.
 
 ## Usage
