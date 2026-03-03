@@ -13,33 +13,69 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to: 2026-04-17
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:20", "14:40"]
             trips: 1
           - times: ["10:40", "11:00", "14:00", "14:20"]
           - times: ["15:00"]
             trips: 2
+      - from: 2026-04-01
+        to: 2026-04-17
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["14:00", "14:20"]
+          - times: ["14:40"]
+            trips: 1
+          - times: ["15:00"]
+            trips: 2
       - from: 2026-04-18
         to: 2026-06-28
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         first_shift_advance: 45
         start_times:
           - times: ["10:20", "14:00"]
             trips: 3
           - times: ["10:40", "11:00", "14:20", "14:40", "15:00"]
+      - from: 2026-04-18
+        to: 2026-06-28
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["14:00"]
+            trips: 3
+          - times: ["14:20", "14:40", "15:00"]
       - from: 2026-06-29
         to: 2026-08-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         first_shift_advance: 60
         start_times:
           - times: ["10:20", "11:00", "14:00", "15:00"]
             trips: 3
           - times: ["10:00", "10:40", "11:20", "14:20", "14:40"]
+      - from: 2026-06-29
+        to: 2026-08-31
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["14:00", "15:00"]
+            trips: 3
+          - times: ["14:20", "14:40"]
       - from: 2026-09-01
         to: 2026-10-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         first_shift_advance: 30
         start_times:
           - times: ["10:20", "14:40"]
             trips: 1
           - times: ["10:40", "11:00", "14:00", "14:20"]
+          - times: ["15:00"]
+            trips: 2
+      - from: 2026-09-01
+        to: 2026-10-31
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["14:00", "14:20"]
+          - times: ["14:40"]
+            trips: 1
           - times: ["15:00"]
             trips: 2
   HRv_:
@@ -63,8 +99,14 @@ shift_type:
           - times: ["11:15", "13:15", "15:15"]
       - from: 2026-06-29
         to: 2026-08-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["11:15", "13:15", "15:15"]
+      - from: 2026-06-29
+        to: 2026-08-31
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["15:15"]
       - from: 2026-09-01
         to: 2026-10-31
         weekdays: ["Tue", "Wed", "Thu", "Fri"]
@@ -86,6 +128,7 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to: 2026-10-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:15", "13:45"]
   JBRv:
@@ -99,6 +142,7 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to: 2026-10-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:15", "13:45"]
   HTS_:
@@ -111,14 +155,22 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to: 2026-06-28
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:30", "10:45", "12:50", "13:05"]
       - from: 2026-06-29
         to: 2026-08-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]
+      - from: 2026-06-29
+        to: 2026-08-31
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["15:10", "15:25"]
       - from: 2026-09-01
         to: 2026-10-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:30", "10:45", "12:50", "13:05"]
   KHR_:
@@ -144,5 +196,11 @@ shift_type:
     date_ranges:
       - from: 2026-04-01
         to: 2026-10-31
+        weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         start_times:
           - times: ["10:00", "14:00"]
+      - from: 2026-04-01
+        to: 2026-10-31
+        weekdays: ["Mon"]
+        start_times:
+          - times: ["14:00"]
