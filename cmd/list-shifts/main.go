@@ -108,20 +108,56 @@ func renderShiftTable(cfg model.Config) string {
 
 		fmt.Fprintf(&sb, "## %s – %s\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
 
-		// one table per shift type
+		// Group entries by code so that multiple DateRanges for the same shift
+		// type (e.g. split by weekday) are merged into one table.
+		var orderedCodes []string
+		byCode := map[string][]windowEntry{}
 		for _, e := range entries {
-			fmt.Fprintf(&sb, "\n### %s\n\n", e.summary)
+			if _, exists := byCode[e.code]; !exists {
+				orderedCodes = append(orderedCodes, e.code)
+			}
+			byCode[e.code] = append(byCode[e.code], e)
+		}
+
+		for _, code := range orderedCodes {
+			group := byCode[code]
+			fmt.Fprintf(&sb, "\n### %s\n\n", group[0].summary)
 
 			sb.WriteString("| Day | Times |\n")
 			sb.WriteString("| --- | --- |\n")
 
 			for _, wd := range weekdayOrder {
-				times := timesForWeekday(e.dr, wd)
+				times := mergedTimesForWeekday(group, wd)
 				fmt.Fprintf(&sb, "| %s | %s |\n", wd.String()[:3], times)
 			}
 		}
 	}
 	return sb.String()
+}
+
+// mergedTimesForWeekday unions the start times across all entries in a group for
+// the given weekday, returning a sorted, deduplicated, comma-joined string, or
+// "–" if no entry contributes any times.
+func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) string {
+	seen := map[string]struct{}{}
+	var times []string
+	for _, e := range group {
+		t := timesForWeekday(e.dr, wd)
+		if t == "–" {
+			continue
+		}
+		for _, s := range strings.Split(t, ", ") {
+			if _, exists := seen[s]; !exists {
+				seen[s] = struct{}{}
+				times = append(times, s)
+			}
+		}
+	}
+	if len(times) == 0 {
+		return "–"
+	}
+	sort.Strings(times)
+	return strings.Join(times, ", ")
 }
 
 // timesForWeekday returns the sorted, comma-joined start times for wd in dr,

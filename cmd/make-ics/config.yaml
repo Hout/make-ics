@@ -20,13 +20,13 @@ shift_type:
           - times: ["15:00"]
             trips: 2
       - from: 2026-04-18
-        to: 2026-06-26
+        to: 2026-06-28
         first_shift_advance: 45
         start_times:
           - times: ["10:20", "14:00"]
             trips: 3
           - times: ["10:40", "11:00", "14:20", "14:40", "15:00"]
-      - from: 2026-06-27
+      - from: 2026-06-29
         to: 2026-08-31
         first_shift_advance: 60
         start_times:
@@ -110,10 +110,10 @@ shift_type:
     last_shift_remains: 30
     date_ranges:
       - from: 2026-04-01
-        to: 2026-06-26
+        to: 2026-06-28
         start_times:
           - times: ["10:30", "10:45", "12:50", "13:05"]
-      - from: 2026-06-27
+      - from: 2026-06-29
         to: 2026-08-31
         start_times:
           - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]

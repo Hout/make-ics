@@ -117,6 +117,68 @@ func TestRenderShiftTable_SortedTimes(t *testing.T) {
 	}
 }
 
+func TestRenderShiftTable_NoDuplicateHeadings(t *testing.T) {
+	// BBB_ has two DateRanges for the same dates, split by weekday — a common
+	// config pattern that previously produced two identical ### headings.
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		ShiftType: map[string]model.ShiftType{
+			"BBB_": {
+				Summary: "Binnendieze BBB",
+				Trips:   intPtr(1),
+				DateRanges: []model.DateRange{
+					{
+						From:     date(2026, time.April, 1),
+						To:       date(2026, time.June, 30),
+						Weekdays: []string{"Tue", "Wed", "Thu", "Fri"},
+						StartTimes: []model.StartTimeGroup{
+							{Times: []string{"13:00", "15:00"}},
+						},
+					},
+					{
+						From:     date(2026, time.April, 1),
+						To:       date(2026, time.June, 30),
+						Weekdays: []string{"Sat", "Sun"},
+						StartTimes: []model.StartTimeGroup{
+							{Times: []string{"11:00"}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	out := renderShiftTable(cfg)
+
+	// Must appear exactly once.
+	count := strings.Count(out, "### Binnendieze BBB")
+	if count != 1 {
+		t.Errorf("expected exactly 1 occurrence of ### Binnendieze BBB, got %d\noutput:\n%s", count, out)
+	}
+
+	// Times from both weekday sub-ranges must be present.
+	lines := strings.Split(out, "\n")
+	var tueLine, satLine string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "| Tue |") {
+			tueLine = l
+		}
+		if strings.HasPrefix(l, "| Sat |") {
+			satLine = l
+		}
+	}
+	if !strings.Contains(tueLine, "13:00") {
+		t.Errorf("Tue row should contain 13:00; got: %s", tueLine)
+	}
+	if !strings.Contains(satLine, "11:00") {
+		t.Errorf("Sat row should contain 11:00; got: %s", satLine)
+	}
+	if strings.Contains(tueLine, "11:00") {
+		t.Errorf("Tue row should not contain Sat-only time 11:00; got: %s", tueLine)
+	}
+}
+
 func TestTimesForWeekday_NoFilter(t *testing.T) {
 	dr := model.DateRange{
 		StartTimes: []model.StartTimeGroup{
