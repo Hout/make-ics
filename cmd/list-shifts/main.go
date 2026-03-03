@@ -110,8 +110,7 @@ func renderShiftTable(cfg model.Config) string {
 
 		// one table per shift type
 		for _, e := range entries {
-			shortSummary := strings.TrimPrefix(e.summary, "Binnendieze ")
-			fmt.Fprintf(&sb, "\n### %s (%s)\n\n", e.code, shortSummary)
+			fmt.Fprintf(&sb, "\n### %s\n\n", e.summary)
 
 			sb.WriteString("| Day | Times |\n")
 			sb.WriteString("| --- | --- |\n")

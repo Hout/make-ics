@@ -65,8 +65,8 @@ func TestRenderShiftTable_ContainsSections(t *testing.T) {
 	for _, want := range []string{
 		"## 2026-04-01",
 		"## 2026-07-01",
-		"AAA_",
-		"BBB_",
+		"Binnendieze AAA",
+		"Binnendieze BBB",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output does not contain %q\ngot:\n%s", want, out)
@@ -82,7 +82,7 @@ func TestRenderShiftTable_WeekdayFilter(t *testing.T) {
 	inBBB := false
 	var monLine, satLine string
 	for _, l := range lines {
-		if strings.Contains(l, "### BBB_") {
+		if strings.Contains(l, "### Binnendieze BBB") {
 			inBBB = true
 			continue
 		}

@@ -1,6 +1,6 @@
 ## 2026-04-01 – 2026-04-17
 
-### HRm_ (HRM)
+### Binnendieze HRM
 
 | Day | Times |
 | --- | --- |
@@ -12,7 +12,7 @@
 | Sat | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 | Sun | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 
-### HRv_ (HRV)
+### Binnendieze HRV
 
 | Day | Times |
 | --- | --- |
@@ -24,7 +24,7 @@
 | Sat | – |
 | Sun | – |
 
-### HTS_ (HTS)
+### Binnendieze HTS
 
 | Day | Times |
 | --- | --- |
@@ -36,7 +36,7 @@
 | Sat | 10:30, 10:45, 12:50, 13:05 |
 | Sun | 10:30, 10:45, 12:50, 13:05 |
 
-### JBRv (JBRV)
+### Binnendieze JBRV
 
 | Day | Times |
 | --- | --- |
@@ -48,7 +48,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### KHR_ (KHR)
+### Binnendieze KHR
 
 | Day | Times |
 | --- | --- |
@@ -60,7 +60,7 @@
 | Sat | 12:10 |
 | Sun | 12:10 |
 
-### VRk_ (VRK)
+### Binnendieze VRK
 
 | Day | Times |
 | --- | --- |
@@ -72,7 +72,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### WS__ (WS)
+### Binnendieze WS
 
 | Day | Times |
 | --- | --- |
@@ -86,7 +86,7 @@
 
 ## 2026-04-18 – 2026-06-26
 
-### HRm_ (HRM)
+### Binnendieze HRM
 
 | Day | Times |
 | --- | --- |
@@ -98,7 +98,7 @@
 | Sat | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 | Sun | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 
-### HRv_ (HRV)
+### Binnendieze HRV
 
 | Day | Times |
 | --- | --- |
@@ -110,7 +110,7 @@
 | Sat | – |
 | Sun | – |
 
-### HTS_ (HTS)
+### Binnendieze HTS
 
 | Day | Times |
 | --- | --- |
@@ -122,7 +122,7 @@
 | Sat | 10:30, 10:45, 12:50, 13:05 |
 | Sun | 10:30, 10:45, 12:50, 13:05 |
 
-### JBRv (JBRV)
+### Binnendieze JBRV
 
 | Day | Times |
 | --- | --- |
@@ -134,7 +134,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### KHR_ (KHR)
+### Binnendieze KHR
 
 | Day | Times |
 | --- | --- |
@@ -146,7 +146,7 @@
 | Sat | 12:10 |
 | Sun | 12:10 |
 
-### VRk_ (VRK)
+### Binnendieze VRK
 
 | Day | Times |
 | --- | --- |
@@ -158,7 +158,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### WS__ (WS)
+### Binnendieze WS
 
 | Day | Times |
 | --- | --- |
@@ -172,7 +172,7 @@
 
 ## 2026-06-27 – 2026-08-31
 
-### HRm_ (HRM)
+### Binnendieze HRM
 
 | Day | Times |
 | --- | --- |
@@ -184,7 +184,7 @@
 | Sat | 10:00, 10:20, 10:40, 11:00, 11:20, 14:00, 14:20, 14:40, 15:00 |
 | Sun | 10:00, 10:20, 10:40, 11:00, 11:20, 14:00, 14:20, 14:40, 15:00 |
 
-### HRv_ (HRV)
+### Binnendieze HRV
 
 | Day | Times |
 | --- | --- |
@@ -196,7 +196,7 @@
 | Sat | 11:15, 13:15, 15:15 |
 | Sun | 11:15, 13:15, 15:15 |
 
-### HTS_ (HTS)
+### Binnendieze HTS
 
 | Day | Times |
 | --- | --- |
@@ -208,7 +208,7 @@
 | Sat | 10:30, 10:45, 12:50, 13:05, 15:10, 15:25 |
 | Sun | 10:30, 10:45, 12:50, 13:05, 15:10, 15:25 |
 
-### JBRv (JBRV)
+### Binnendieze JBRV
 
 | Day | Times |
 | --- | --- |
@@ -220,7 +220,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### KHR_ (KHR)
+### Binnendieze KHR
 
 | Day | Times |
 | --- | --- |
@@ -232,7 +232,7 @@
 | Sat | 12:10 |
 | Sun | 12:10 |
 
-### VRk_ (VRK)
+### Binnendieze VRK
 
 | Day | Times |
 | --- | --- |
@@ -244,7 +244,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### WS__ (WS)
+### Binnendieze WS
 
 | Day | Times |
 | --- | --- |
@@ -258,7 +258,7 @@
 
 ## 2026-09-01 – 2026-10-31
 
-### HRm_ (HRM)
+### Binnendieze HRM
 
 | Day | Times |
 | --- | --- |
@@ -270,7 +270,7 @@
 | Sat | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 | Sun | 10:20, 10:40, 11:00, 14:00, 14:20, 14:40, 15:00 |
 
-### HRv_ (HRV)
+### Binnendieze HRV
 
 | Day | Times |
 | --- | --- |
@@ -282,7 +282,7 @@
 | Sat | – |
 | Sun | – |
 
-### HTS_ (HTS)
+### Binnendieze HTS
 
 | Day | Times |
 | --- | --- |
@@ -294,7 +294,7 @@
 | Sat | 10:30, 10:45, 12:50, 13:05 |
 | Sun | 10:30, 10:45, 12:50, 13:05 |
 
-### JBRv (JBRV)
+### Binnendieze JBRV
 
 | Day | Times |
 | --- | --- |
@@ -306,7 +306,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### KHR_ (KHR)
+### Binnendieze KHR
 
 | Day | Times |
 | --- | --- |
@@ -318,7 +318,7 @@
 | Sat | 12:10 |
 | Sun | 12:10 |
 
-### VRk_ (VRK)
+### Binnendieze VRK
 
 | Day | Times |
 | --- | --- |
@@ -330,7 +330,7 @@
 | Sat | 10:15, 13:45 |
 | Sun | 10:15, 13:45 |
 
-### WS__ (WS)
+### Binnendieze WS
 
 | Day | Times |
 | --- | --- |
