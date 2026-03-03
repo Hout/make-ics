@@ -106,30 +106,20 @@ func renderShiftTable(cfg model.Config) string {
 		}
 		first = false
 
-		fmt.Fprintf(&sb, "## %s – %s\n\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "## %s – %s\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
 
-		// header row: "code (summary)" combined in one cell
-		sb.WriteString("| Day |")
+		// one table per shift type
 		for _, e := range entries {
 			shortSummary := strings.TrimPrefix(e.summary, "Binnendieze ")
-			fmt.Fprintf(&sb, " %s (%s) |", e.code, shortSummary)
-		}
-		sb.WriteString("\n")
+			fmt.Fprintf(&sb, "\n### %s (%s)\n\n", e.code, shortSummary)
 
-		// separator
-		sb.WriteString("| --- |")
-		for range entries {
-			sb.WriteString(" --- |")
-		}
-		sb.WriteString("\n")
+			sb.WriteString("| Day | Times |\n")
+			sb.WriteString("| --- | --- |\n")
 
-		// one row per weekday
-		for _, wd := range weekdayOrder {
-			fmt.Fprintf(&sb, "| %s |", wd.String()[:3])
-			for _, e := range entries {
-				fmt.Fprintf(&sb, " %s |", timesForWeekday(e.dr, wd))
+			for _, wd := range weekdayOrder {
+				times := timesForWeekday(e.dr, wd)
+				fmt.Fprintf(&sb, "| %s | %s |\n", wd.String()[:3], times)
 			}
-			sb.WriteString("\n")
 		}
 	}
 	return sb.String()

@@ -77,24 +77,30 @@ func TestRenderShiftTable_ContainsSections(t *testing.T) {
 func TestRenderShiftTable_WeekdayFilter(t *testing.T) {
 	out := renderShiftTable(minimalConfig())
 
-	// Extract the first | Mon | and first | Sat | rows, which belong to the
-	// Apr–Jun window where both AAA_ (all days) and BBB_ (Sat/Sun only) appear.
+	// Find the BBB_ section (Sat/Sun only) and extract its Mon and Sat rows.
 	lines := strings.Split(out, "\n")
+	inBBB := false
 	var monLine, satLine string
 	for _, l := range lines {
-		if monLine == "" && strings.HasPrefix(l, "| Mon |") {
-			monLine = l
+		if strings.Contains(l, "### BBB_") {
+			inBBB = true
+			continue
 		}
-		if satLine == "" && strings.HasPrefix(l, "| Sat |") {
-			satLine = l
+		if inBBB && strings.HasPrefix(l, "###") {
+			break // entered next shift section
 		}
-		if monLine != "" && satLine != "" {
-			break
+		if inBBB {
+			if strings.HasPrefix(l, "| Mon |") {
+				monLine = l
+			}
+			if strings.HasPrefix(l, "| Sat |") {
+				satLine = l
+			}
 		}
 	}
 
-	// BBB_ is Sat/Sun only — Monday column for BBB_ should show "–"
-	if !strings.Contains(monLine, "– |") {
+	// BBB_ is Sat/Sun only — Monday should show "–"
+	if !strings.Contains(monLine, "–") {
 		t.Errorf("Monday row should show – for BBB_; got: %s", monLine)
 	}
 	// Saturday row for BBB_ should show the time
