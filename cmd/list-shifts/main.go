@@ -32,12 +32,7 @@ func main() {
 	}
 }
 
-// windowKey uniquely identifies a date-range window.
-type windowKey struct {
-	from, to time.Time
-}
-
-// windowEntry holds one shift type's DateRange within a window.
+// windowEntry holds one shift type's DateRange.
 type windowEntry struct {
 	code    string
 	summary string
@@ -65,54 +60,59 @@ func Run(args []string) error {
 	return nil
 }
 
-// renderShiftTable builds the full Markdown output for all windows.
+// renderShiftTable builds the full Markdown output as disjunct period sections.
+// A sweep-line over all boundary dates produces non-overlapping intervals;
+// every shift type active in each interval is included in that section's table.
 func renderShiftTable(cfg model.Config) string {
-	windows := map[windowKey][]windowEntry{}
-	var keys []windowKey
+	// Collect all entries and boundary dates.
+	var all []windowEntry
+	boundarySet := map[time.Time]struct{}{}
 
 	for code, st := range cfg.ShiftType {
 		for _, dr := range st.DateRanges {
-			k := windowKey{from: dr.From, to: dr.To}
-			if _, exists := windows[k]; !exists {
-				keys = append(keys, k)
-			}
-			windows[k] = append(windows[k], windowEntry{code: code, summary: st.Summary, dr: dr})
+			all = append(all, windowEntry{code: code, summary: st.Summary, dr: dr})
+			boundarySet[dr.From] = struct{}{}
+			boundarySet[dr.To.AddDate(0, 0, 1)] = struct{}{}
 		}
 	}
 
-	// sort windows chronologically
-	sort.Slice(keys, func(i, j int) bool {
-		a, b := keys[i], keys[j]
-		if !a.from.Equal(b.from) {
-			return a.from.Before(b.from)
-		}
-		return a.to.Before(b.to)
-	})
+	// Sort unique boundary dates.
+	boundaries := make([]time.Time, 0, len(boundarySet))
+	for t := range boundarySet {
+		boundaries = append(boundaries, t)
+	}
+	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i].Before(boundaries[j]) })
 
 	var sb strings.Builder
-	for wi, k := range keys {
-		if wi > 0 {
+	first := true
+	for i := 0; i+1 < len(boundaries); i++ {
+		start := boundaries[i]
+		end := boundaries[i+1].AddDate(0, 0, -1)
+
+		// Collect entries whose date range overlaps [start, end].
+		var entries []windowEntry
+		for _, e := range all {
+			if !e.dr.From.After(end) && !e.dr.To.Before(start) {
+				entries = append(entries, e)
+			}
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].code < entries[j].code })
+
+		if !first {
 			sb.WriteString("\n")
 		}
-		entries := windows[k]
-		sort.Slice(entries, func(i, j int) bool {
-			return entries[i].code < entries[j].code
-		})
+		first = false
 
-		fmt.Fprintf(&sb, "## %s – %s\n\n", k.from.Format("2006-01-02"), k.to.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "## %s – %s\n\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
 
-		// header row: code over summary
+		// header row: "code (summary)" combined in one cell
 		sb.WriteString("| Day |")
 		for _, e := range entries {
-			fmt.Fprintf(&sb, " %s |", e.code)
-		}
-		sb.WriteString("\n")
-
-		// summary row as subheader (html comment style keeps table valid)
-		sb.WriteString("| :--- |")
-		for _, e := range entries {
 			shortSummary := strings.TrimPrefix(e.summary, "Binnendieze ")
-			fmt.Fprintf(&sb, " *%s* |", shortSummary)
+			fmt.Fprintf(&sb, " %s (%s) |", e.code, shortSummary)
 		}
 		sb.WriteString("\n")
 
