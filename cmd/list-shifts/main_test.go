@@ -408,10 +408,10 @@ func TestRenderMermaidCharts_Structure(t *testing.T) {
 		"gantt",
 		"dateFormat HH:mm",
 		"section VRK",
-		// trip 1 of 10:15: starts 10:15, label must not contain ':'
-		"10h15 (1) : 10:15, 75m",
-		// trip 2 of 10:15: 10:15 + 75min = 11:30, then 30min break = 12:00
-		"12h00 (2) : 12:00, 75m",
+		// 10:15 departure: 2 trips × 75m + 1 break × 30m = 180m total span
+		"10h15 : 10:15, 180m",
+		// 13:45 departure: same config = 180m
+		"13h45 : 13:45, 180m",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in mermaid output\nfull output:\n%s", want, out)

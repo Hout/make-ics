@@ -166,8 +166,9 @@ func renderShiftTable(cfg model.Config, showTrips bool) string {
 }
 
 // renderMermaidCharts produces a Markdown document where each date-range window
-// is rendered as a Mermaid Gantt chart. The chart shows individual trip bars
-// for the representative weekday (the one with the most active shift types).
+// is rendered as a Mermaid Gantt chart. Each departure is shown as a single bar
+// spanning from the first trip's start to the last trip's end (breaks included).
+// The chart uses the representative weekday (the one with the most active shifts).
 // The output goes to stdout so it can be redirected to a Markdown file.
 func renderMermaidCharts(cfg model.Config) string {
 	var all []windowEntry
@@ -232,17 +233,16 @@ func renderMermaidCharts(cfg model.Config) string {
 
 		for _, code := range orderedCodes {
 			group := byCode[code]
-			segs := resolveTripsForWeekday(group, *repDay)
-			if len(segs) == 0 {
+			deps := resolveDeparturesForWeekday(group, *repDay)
+			if len(deps) == 0 {
 				continue
 			}
 			fmt.Fprintf(&sb, "\n    section %s\n", group[0].summary)
-			for _, seg := range segs {
+			for _, dep := range deps {
 				// Gantt task labels must not contain ':' (it is the separator).
 				// Replace ':' in the time with 'h': "10:20" -> "10h20".
-				label := strings.Replace(seg.start, ":", "h", 1) +
-					fmt.Sprintf(" (%d)", seg.seq)
-				fmt.Fprintf(&sb, "        %s : %s, %dm\n", label, seg.start, seg.duration)
+				label := strings.Replace(dep.start, ":", "h", 1)
+				fmt.Fprintf(&sb, "        %s : %s, %dm\n", label, dep.start, dep.totalDuration)
 			}
 		}
 		sb.WriteString("```\n")
@@ -251,7 +251,7 @@ func renderMermaidCharts(cfg model.Config) string {
 }
 
 // pickRepresentativeDay returns the first weekday (Mon→Sun) that has the most
-// shift types with resolvable trip segments active in the given window.
+// shift types with resolvable departure bars active in the given window.
 // Returns nil when no weekday has any active shift.
 func pickRepresentativeDay(byCode map[string][]windowEntry, orderedCodes []string) *time.Weekday {
 	bestCount := 0
@@ -259,7 +259,7 @@ func pickRepresentativeDay(byCode map[string][]windowEntry, orderedCodes []strin
 	for _, wd := range weekdayOrder {
 		count := 0
 		for _, code := range orderedCodes {
-			if len(resolveTripsForWeekday(byCode[code], wd)) > 0 {
+			if len(resolveDeparturesForWeekday(byCode[code], wd)) > 0 {
 				count++
 			}
 		}
@@ -274,18 +274,20 @@ func pickRepresentativeDay(byCode map[string][]windowEntry, orderedCodes []strin
 
 // tripSeg holds a resolved trip segment: start time, trip duration in minutes,
 // and 1-based sequence number within its departure run.
-type tripSeg struct {
-	start    string
-	duration int
-	seq      int
+// depBar holds one departure's start time and its total span in minutes
+// (trips × tripDuration + max(0, trips−1) × breakDuration).
+type depBar struct {
+	start         string
+	totalDuration int
 }
 
-// resolveTripsForWeekday returns the sorted, deduplicated trip segments for wd
-// across all entries in group, using the three-level override chain
-// (StartTimeGroup → DateRange → ShiftType) for trips, tripDuration, and
-// breakDuration. Entries without a resolved tripDuration are silently skipped.
-func resolveTripsForWeekday(group []windowEntry, wd time.Weekday) []tripSeg {
-	seen := map[string]tripSeg{}
+// resolveDeparturesForWeekday returns one depBar per unique departure start time
+// for wd across all entries in group, using the three-level override chain
+// (StartTimeGroup → DateRange → ShiftType). The bar spans the full working time
+// from the first trip start to the last trip end (breaks included).
+// Entries without a resolved tripDuration are silently skipped.
+func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar {
+	seen := map[string]depBar{}
 	for _, e := range group {
 		if !weekdayAllowed(e.dr, wd) {
 			continue
@@ -322,22 +324,22 @@ func resolveTripsForWeekday(group []windowEntry, wd time.Weekday) []tripSeg {
 			if breakDuration != nil {
 				bd = *breakDuration
 			}
+			n := *trips
+			td := *tripDuration
+			total := n*td + max(0, n-1)*bd
 			for _, ts := range g.Times {
-				h, m := parseHHMM(ts)
-				for i, seg := range schedule.BuildTripTimes(h, m, *trips, *tripDuration, bd) {
-					if _, exists := seen[seg.Start]; !exists {
-						seen[seg.Start] = tripSeg{start: seg.Start, duration: *tripDuration, seq: i + 1}
-					}
+				if _, exists := seen[ts]; !exists {
+					seen[ts] = depBar{start: ts, totalDuration: total}
 				}
 			}
 		}
 	}
-	segs := make([]tripSeg, 0, len(seen))
-	for _, ts := range seen {
-		segs = append(segs, ts)
+	bars := make([]depBar, 0, len(seen))
+	for _, b := range seen {
+		bars = append(bars, b)
 	}
-	sort.Slice(segs, func(i, j int) bool { return segs[i].start < segs[j].start })
-	return segs
+	sort.Slice(bars, func(i, j int) bool { return bars[i].start < bars[j].start })
+	return bars
 }
 
 // mergedTimesForWeekday unions the start times across all entries in a group for
