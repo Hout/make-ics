@@ -63,14 +63,30 @@ func TestRenderShiftTable_ContainsSections(t *testing.T) {
 	out := renderShiftTable(minimalConfig())
 
 	for _, want := range []string{
-		"## 2026-04-01",
-		"## 2026-07-01",
+		"## 01-Apr-26 > 30-Jun-26",
+		"## 01-Jul-26 > 31-Aug-26",
 		"Binnendieze AAA",
 		"Binnendieze BBB",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output does not contain %q\ngot:\n%s", want, out)
 		}
+	}
+}
+
+func TestFormatDateRange_SameMonth(t *testing.T) {
+	start := date(2026, time.April, 1)
+	end := date(2026, time.April, 17)
+	if got := formatDateRange(start, end); got != "01 > 17 Apr-26" {
+		t.Errorf("got %q, want \"01 > 17 Apr-26\"", got)
+	}
+}
+
+func TestFormatDateRange_CrossMonth(t *testing.T) {
+	start := date(2026, time.April, 18)
+	end := date(2026, time.June, 28)
+	if got := formatDateRange(start, end); got != "18-Apr-26 > 28-Jun-26" {
+		t.Errorf("got %q, want \"18-Apr-26 > 28-Jun-26\"", got)
 	}
 }
 

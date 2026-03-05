@@ -14,6 +14,20 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
+// dateFmt is the date layout used in section headings when dates span multiple months.
+const dateFmt = "02-Jan-06"
+
+// formatDateRange formats a date range for a section heading.
+// When start and end fall in the same month and year the compact form
+// "dd > dd Mmm-yy" is used; otherwise both dates are rendered in full
+// as "dd-Mmm-yy – dd-Mmm-yy".
+func formatDateRange(start, end time.Time) string {
+	if start.Month() == end.Month() && start.Year() == end.Year() {
+		return fmt.Sprintf("%02d > %02d %s", start.Day(), end.Day(), end.Format("Jan-06"))
+	}
+	return start.Format(dateFmt) + " > " + end.Format(dateFmt)
+}
+
 // weekdayOrder defines the display order Mon → Sun.
 var weekdayOrder = []time.Weekday{
 	time.Monday,
@@ -115,7 +129,7 @@ func renderShiftTable(cfg model.Config) string {
 		}
 		first = false
 
-		fmt.Fprintf(&sb, "## %s \u2013 %s\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
+		fmt.Fprintf(&sb, "## %s\n", formatDateRange(start, end))
 
 		// Group entries by code so that multiple DateRanges for the same shift
 		// type (e.g. split by weekday) are merged into one table.
@@ -207,12 +221,12 @@ func renderMermaidCharts(cfg model.Config) string {
 		}
 		first = false
 
-		fmt.Fprintf(&sb, "## %s \u2013 %s (%s)\n\n",
-			wStart.Format("2006-01-02"), wEnd.Format("2006-01-02"), repDay.String()[:3])
+		fmt.Fprintf(&sb, "## %s (%s)\n\n",
+			formatDateRange(wStart, wEnd), repDay.String()[:3])
 		sb.WriteString("```mermaid\n")
 		sb.WriteString("gantt\n")
 		fmt.Fprintf(&sb, "    title Shifts \u2013 %s (%s to %s)\n",
-			repDay.String(), wStart.Format("2006-01-02"), wEnd.Format("2006-01-02"))
+			repDay.String(), wStart.Format(dateFmt), wEnd.Format(dateFmt))
 		sb.WriteString("    dateFormat HH:mm\n")
 		sb.WriteString("    axisFormat %H:%M\n")
 
