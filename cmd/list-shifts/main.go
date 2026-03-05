@@ -271,8 +271,6 @@ func pickRepresentativeDay(byCode map[string][]windowEntry, orderedCodes []strin
 	return best
 }
 
-// tripSeg holds a resolved trip segment: start time, trip duration in minutes,
-// and 1-based sequence number within its departure run.
 // depBar holds one departure's start time and its total span in minutes
 // (trips × tripDuration + max(0, trips−1) × breakDuration).
 type depBar struct {
