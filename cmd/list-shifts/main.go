@@ -49,7 +49,6 @@ func Run(args []string) error {
 	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
 	fs.StringVar(cfgPath, "c", "config.yaml", "Path to YAML config file (alias)")
 	showTrips := fs.Bool("trips", false, "Show individual trip start times with sequence numbers")
-	showMermaid := fs.Bool("mermaid", false, "Output Mermaid Gantt charts (one per date-range window)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -62,11 +61,7 @@ func Run(args []string) error {
 		return err
 	}
 
-	if *showMermaid {
-		fmt.Print(renderMermaidCharts(cfg))
-	} else {
-		fmt.Print(renderShiftTable(cfg, *showTrips))
-	}
+	fmt.Print(renderShiftTable(cfg, *showTrips))
 	return nil
 }
 
