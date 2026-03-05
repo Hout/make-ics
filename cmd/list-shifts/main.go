@@ -418,6 +418,25 @@ type tripEntry struct {
 func tripStartsForWeekday(group []windowEntry, wd time.Weekday) string {
 	seen := map[string]tripEntry{}
 
+	// Phase 1: register all departure start times as seq=1.
+	// Departure starts always take priority over intermediate trip times of
+	// an earlier departure that happens to land on the same clock time.
+	for _, e := range group {
+		if !weekdayAllowed(e.dr, wd) {
+			continue
+		}
+		for _, g := range e.dr.StartTimes {
+			for _, ts := range g.Times {
+				if _, exists := seen[ts]; !exists {
+					seen[ts] = tripEntry{time: ts, seq: 1}
+				}
+			}
+		}
+	}
+
+	// Phase 2: expand each departure into its full trip sequence,
+	// adding intermediate trip starts (seq 2, 3, …) only when not already
+	// claimed by a departure start registered in phase 1.
 	for _, e := range group {
 		if !weekdayAllowed(e.dr, wd) {
 			continue
@@ -439,6 +458,9 @@ func tripStartsForWeekday(group []windowEntry, wd time.Weekday) string {
 			} else {
 				tripDuration = e.shiftType.TripDuration
 			}
+			if trips == nil || tripDuration == nil {
+				continue
+			}
 			var breakDuration *int
 			if g.BreakDuration != nil {
 				breakDuration = g.BreakDuration
@@ -452,17 +474,13 @@ func tripStartsForWeekday(group []windowEntry, wd time.Weekday) string {
 				bd = *breakDuration
 			}
 			for _, ts := range g.Times {
-				if trips != nil && tripDuration != nil {
-					h, m := parseHHMM(ts)
-					for i, seg := range schedule.BuildTripTimes(h, m, *trips, *tripDuration, bd) {
-						if _, exists := seen[seg.Start]; !exists {
-							seen[seg.Start] = tripEntry{time: seg.Start, seq: i + 1}
-						}
+				h, m := parseHHMM(ts)
+				for i, seg := range schedule.BuildTripTimes(h, m, *trips, *tripDuration, bd) {
+					if i == 0 {
+						continue // departure start already registered in phase 1
 					}
-				} else {
-					// Fallback: no full trip config — emit raw departure time as trip 1.
-					if _, exists := seen[ts]; !exists {
-						seen[ts] = tripEntry{time: ts, seq: 1}
+					if _, exists := seen[seg.Start]; !exists {
+						seen[seg.Start] = tripEntry{time: seg.Start, seq: i + 1}
 					}
 				}
 			}

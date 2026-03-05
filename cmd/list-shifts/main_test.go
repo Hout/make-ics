@@ -293,7 +293,24 @@ func TestTripStarts_StartTimeGroupOverride(t *testing.T) {
 	}
 }
 
-// --- groupWeekdaysByContent ---
+func TestTripStarts_DepartureAlwaysSeq1(t *testing.T) {
+	// 10:00 departure with trips=3, td=50, bd=30:
+	//   trip 1: 10:00, trip 2: 11:20 (10:00+50m+30m), trip 3: 12:40
+	// 11:20 is ALSO a departure start in the same group.
+	// A departure start time must always be displayed as seq=1,
+	// even if a prior departure's trip 2 lands on the same time.
+	st := model.ShiftType{Trips: intPtr(3), TripDuration: intPtr(50), BreakDuration: intPtr(30)}
+	dr := model.DateRange{
+		StartTimes: []model.StartTimeGroup{{Times: []string{"10:00", "11:20"}}},
+	}
+	got := tripStartsForWeekday(singleEntry(st, dr), time.Monday)
+	if !strings.Contains(got, "10:00(1)") {
+		t.Errorf("departure 10:00 must be seq=1; got: %q", got)
+	}
+	if !strings.Contains(got, "11:20(1)") {
+		t.Errorf("departure 11:20 must be seq=1, not seq=2; got: %q", got)
+	}
+}
 
 func TestGroupWeekdays_AllSame(t *testing.T) {
 	var c [7]string
