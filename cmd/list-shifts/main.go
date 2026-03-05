@@ -398,15 +398,6 @@ func weekdayAllowed(dr model.DateRange, wd time.Weekday) bool {
 	return false
 }
 
-// parseHHMM parses a "HH:MM" string into hour and minute integers.
-func parseHHMM(s string) (int, int) {
-	t, err := time.Parse("15:04", s)
-	if err != nil {
-		return 0, 0
-	}
-	return t.Hour(), t.Minute()
-}
-
 // weekdayGroup is a set of weekdays that share identical cell content.
 type weekdayGroup struct {
 	days []time.Weekday

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	goweb_i18n "github.com/nicksnyder/go-i18n/v2/i18n"
+	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 )
 
@@ -15,7 +15,7 @@ var localesFS embed.FS
 
 // Localizer wraps go-i18n v2 and exposes simplified T/N accessors.
 type Localizer struct {
-	loc *goweb_i18n.Localizer
+	loc *goi18n.Localizer
 }
 
 // NewLocalizer returns a Localizer for the given locale using the locale files
@@ -26,7 +26,7 @@ func NewLocalizer(locale string) (*Localizer, error) {
 
 // newLocalizerFromFS loads message files from fsys/dir and returns a Localizer.
 func newLocalizerFromFS(fsys fs.FS, dir, locale string) (*Localizer, error) {
-	bundle := goweb_i18n.NewBundle(language.English)
+	bundle := goi18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
@@ -45,18 +45,18 @@ func newLocalizerFromFS(fsys fs.FS, dir, locale string) (*Localizer, error) {
 			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 	}
-	loc := goweb_i18n.NewLocalizer(bundle, locale)
+	loc := goi18n.NewLocalizer(bundle, locale)
 	return &Localizer{loc: loc}, nil
 }
 
 // T returns the localised string for the given message ID, with optional template data.
 func (l *Localizer) T(id string, templateData map[string]any) string {
-	msg, _ := l.loc.Localize(&goweb_i18n.LocalizeConfig{MessageID: id, TemplateData: templateData})
+	msg, _ := l.loc.Localize(&goi18n.LocalizeConfig{MessageID: id, TemplateData: templateData})
 	return msg
 }
 
 // N returns the localised plural string for the given message ID and count.
 func (l *Localizer) N(id string, pluralCount int, templateData map[string]any) string {
-	msg, _ := l.loc.Localize(&goweb_i18n.LocalizeConfig{MessageID: id, PluralCount: &pluralCount, TemplateData: templateData})
+	msg, _ := l.loc.Localize(&goi18n.LocalizeConfig{MessageID: id, PluralCount: &pluralCount, TemplateData: templateData})
 	return msg
 }

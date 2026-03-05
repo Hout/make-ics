@@ -4,8 +4,6 @@ import "time"
 
 // StartTimeGroup is an optional override within a DateRange that narrows
 // scheduling parameters to specific departure times.
-type placeholder_remove_me = struct{}
-
 type StartTimeGroup struct {
 	Times         []string `yaml:"times,omitempty"`
 	Trips         *int     `yaml:"trips,omitempty"`
