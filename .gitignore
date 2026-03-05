@@ -13,3 +13,6 @@ coverage.out
 __pycache__/
 *.pyc
 .coverage
+
+# project files
+test.md

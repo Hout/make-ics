@@ -12,7 +12,6 @@ import (
 
 	"github.com/jeroen/make-ics-go/pkg/config"
 	"github.com/jeroen/make-ics-go/pkg/model"
-	"github.com/jeroen/make-ics-go/pkg/schedule"
 )
 
 // weekdayOrder defines the display order Mon → Sun.
@@ -48,7 +47,7 @@ func Run(args []string) error {
 	fs := flag.NewFlagSet("list-shifts", flag.ContinueOnError)
 	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
 	fs.StringVar(cfgPath, "c", "config.yaml", "Path to YAML config file (alias)")
-	showTrips := fs.Bool("trips", false, "Show individual trip start times with sequence numbers")
+	showMermaid := fs.Bool("mermaid", false, "Output Mermaid Gantt charts (one per date-range window)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -61,17 +60,19 @@ func Run(args []string) error {
 		return err
 	}
 
-	fmt.Print(renderShiftTable(cfg, *showTrips))
+	if *showMermaid {
+		fmt.Print(renderMermaidCharts(cfg))
+	} else {
+		fmt.Print(renderShiftTable(cfg))
+	}
 	return nil
 }
 
 // renderShiftTable builds the full Markdown output as disjunct period sections.
 // A sweep-line over all boundary dates produces non-overlapping intervals;
 // every shift type active in each interval is included in that section's table.
-// When showTrips is true, cells list individual trip start times annotated with
-// their 1-based sequence number (e.g. "10:20(1), 11:40(2)"), and weekdays that
-// share identical content are collapsed into a single row.
-func renderShiftTable(cfg model.Config, showTrips bool) string {
+// Weekdays with identical times are collapsed into a single row (e.g. Tue–Sun).
+func renderShiftTable(cfg model.Config) string {
 	// Collect all entries and boundary dates.
 	var all []windowEntry
 	boundarySet := map[time.Time]struct{}{}
@@ -131,29 +132,18 @@ func renderShiftTable(cfg model.Config, showTrips bool) string {
 			group := byCode[code]
 			fmt.Fprintf(&sb, "\n### %s\n\n", group[0].summary)
 
-			if showTrips {
-				sb.WriteString("| Day | Trips |\n")
-				sb.WriteString("| --- | --- |\n")
+			sb.WriteString("| Day | Times |\n")
+			sb.WriteString("| --- | --- |\n")
 
-				var content [7]string
-				for i, wd := range weekdayOrder {
-					content[i] = tripStartsForWeekday(group, wd)
+			var content [7]string
+			for i, wd := range weekdayOrder {
+				content[i] = mergedTimesForWeekday(group, wd)
+			}
+			for _, grp := range groupWeekdaysByContent(content) {
+				if grp.val == "\u2013" {
+					continue
 				}
-				for _, grp := range groupWeekdaysByContent(content) {
-					dayLabels := make([]string, len(grp.days))
-					for i, d := range grp.days {
-						dayLabels[i] = d.String()[:3]
-					}
-					fmt.Fprintf(&sb, "| %s | %s |\n", strings.Join(dayLabels, ", "), grp.val)
-				}
-			} else {
-				sb.WriteString("| Day | Times |\n")
-				sb.WriteString("| --- | --- |\n")
-
-				for _, wd := range weekdayOrder {
-					times := mergedTimesForWeekday(group, wd)
-					fmt.Fprintf(&sb, "| %s | %s |\n", wd.String()[:3], times)
-				}
+				fmt.Fprintf(&sb, "| %s | %s |\n", formatDayRange(grp.days), grp.val)
 			}
 		}
 	}
@@ -403,109 +393,44 @@ func parseHHMM(s string) (int, int) {
 	return t.Hour(), t.Minute()
 }
 
-// tripEntry holds one trip start time and its 1-based sequence number within
-// its departure run, used when building the trips table column.
-type tripEntry struct {
-	time string
-	seq  int
-}
-
-// tripStartsForWeekday computes the individual trip start times for wd across
-// all entries in a group. Each time is annotated with its 1-based trip sequence
-// number within its departure, e.g. "10:20(1), 11:40(2)". When trip_duration is
-// not configured for a StartTimeGroup, the raw departure time is emitted as (1).
-// Returns "\u2013" when the weekday is excluded or no times are configured.
-func tripStartsForWeekday(group []windowEntry, wd time.Weekday) string {
-	seen := map[string]tripEntry{}
-
-	// Phase 1: register all departure start times as seq=1.
-	// Departure starts always take priority over intermediate trip times of
-	// an earlier departure that happens to land on the same clock time.
-	for _, e := range group {
-		if !weekdayAllowed(e.dr, wd) {
-			continue
-		}
-		for _, g := range e.dr.StartTimes {
-			for _, ts := range g.Times {
-				if _, exists := seen[ts]; !exists {
-					seen[ts] = tripEntry{time: ts, seq: 1}
-				}
-			}
-		}
-	}
-
-	// Phase 2: expand each departure into its full trip sequence,
-	// adding intermediate trip starts (seq 2, 3, …) only when not already
-	// claimed by a departure start registered in phase 1.
-	for _, e := range group {
-		if !weekdayAllowed(e.dr, wd) {
-			continue
-		}
-		for _, g := range e.dr.StartTimes {
-			var trips *int
-			if g.Trips != nil {
-				trips = g.Trips
-			} else if e.dr.Trips != nil {
-				trips = e.dr.Trips
-			} else {
-				trips = e.shiftType.Trips
-			}
-			var tripDuration *int
-			if g.TripDuration != nil {
-				tripDuration = g.TripDuration
-			} else if e.dr.TripDuration != nil {
-				tripDuration = e.dr.TripDuration
-			} else {
-				tripDuration = e.shiftType.TripDuration
-			}
-			if trips == nil || tripDuration == nil {
-				continue
-			}
-			var breakDuration *int
-			if g.BreakDuration != nil {
-				breakDuration = g.BreakDuration
-			} else if e.dr.BreakDuration != nil {
-				breakDuration = e.dr.BreakDuration
-			} else {
-				breakDuration = e.shiftType.BreakDuration
-			}
-			bd := 0
-			if breakDuration != nil {
-				bd = *breakDuration
-			}
-			for _, ts := range g.Times {
-				h, m := parseHHMM(ts)
-				for i, seg := range schedule.BuildTripTimes(h, m, *trips, *tripDuration, bd) {
-					if i == 0 {
-						continue // departure start already registered in phase 1
-					}
-					if _, exists := seen[seg.Start]; !exists {
-						seen[seg.Start] = tripEntry{time: seg.Start, seq: i + 1}
-					}
-				}
-			}
-		}
-	}
-
-	if len(seen) == 0 {
-		return "\u2013"
-	}
-	entries := make([]tripEntry, 0, len(seen))
-	for _, te := range seen {
-		entries = append(entries, te)
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].time < entries[j].time })
-	parts := make([]string, len(entries))
-	for i, te := range entries {
-		parts[i] = fmt.Sprintf("%s(%d)", te.time, te.seq)
-	}
-	return strings.Join(parts, ", ")
-}
-
 // weekdayGroup is a set of weekdays that share identical cell content.
 type weekdayGroup struct {
 	days []time.Weekday
 	val  string
+}
+
+// formatDayRange formats a slice of weekdays (in Mon→Sun order) as a compact
+// range string, collapsing consecutive runs with an en-dash, e.g. [Tue Wed Thu
+// Fri Sat Sun] → "Tue–Sun", [Mon Sat Sun] → "Mon, Sat–Sun".
+func formatDayRange(days []time.Weekday) string {
+	// Build an index so we can detect consecutiveness.
+	wdIndex := map[time.Weekday]int{}
+	for i, wd := range weekdayOrder {
+		wdIndex[wd] = i
+	}
+
+	var parts []string
+	runStart := days[0]
+	runEnd := days[0]
+	for _, wd := range days[1:] {
+		if wdIndex[wd] == wdIndex[runEnd]+1 {
+			runEnd = wd
+		} else {
+			parts = append(parts, fmtRun(runStart, runEnd))
+			runStart = wd
+			runEnd = wd
+		}
+	}
+	parts = append(parts, fmtRun(runStart, runEnd))
+	return strings.Join(parts, ", ")
+}
+
+// fmtRun formats a single consecutive run of weekdays.
+func fmtRun(start, end time.Weekday) string {
+	if start == end {
+		return start.String()[:3]
+	}
+	return start.String()[:3] + "\u2013" + end.String()[:3]
 }
 
 // groupWeekdaysByContent groups the 7 Mon–Sun content strings so that weekdays
