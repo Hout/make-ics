@@ -71,15 +71,15 @@ func GetLastShiftAftercare(shift model.ShiftType, rangeEntry *dr.ResolvedRange) 
 	return 0
 }
 
-// GetShiftPreparation returns the per-shift preparation minutes used as the
-// advance for non-first shifts, with rangeEntry taking precedence over the
-// shift setting. Returns nil when not configured (caller uses its own default).
-func GetShiftPreparation(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
-	if rangeEntry != nil && rangeEntry.ShiftPreparation != nil {
-		return rangeEntry.ShiftPreparation
+// GetShiftPreparationDuration returns the per-shift preparation minutes, with
+// rangeEntry taking precedence over the shift setting. Returns nil when not
+// configured (caller uses its own default).
+func GetShiftPreparationDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && rangeEntry.ShiftPreparationDuration != nil {
+		return rangeEntry.ShiftPreparationDuration
 	}
-	if shift.ShiftPreparation != nil {
-		return shift.ShiftPreparation
+	if shift.ShiftPreparationDuration != nil {
+		return shift.ShiftPreparationDuration
 	}
 	return nil
 }

@@ -107,41 +107,41 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 
 		// resolve effective first-shift count (how many leading shifts get the advance)
 		effectiveCount := 1
-		if rangeEntry != nil && rangeEntry.FirstShiftCount != nil {
-			effectiveCount = *rangeEntry.FirstShiftCount
-		} else if hasShift && shift.FirstShiftCount != nil {
-			effectiveCount = *shift.FirstShiftCount
+		if rangeEntry != nil && rangeEntry.FirstShiftPreparationCount != nil {
+			effectiveCount = *rangeEntry.FirstShiftPreparationCount
+		} else if hasShift && shift.FirstShiftPreparationCount != nil {
+			effectiveCount = *shift.FirstShiftPreparationCount
 		}
 
-		// resolve first_shift_advance_time and first_shift_advance_duration independently so
+		// resolve first_shift_preparation_time and first_shift_preparation_duration independently so
 		// cross-level conflicts (one from range, other from shift) can be detected.
-		var effectiveFirstAdvanceTime *string
-		var effectiveFirstAdvanceTimeSrc string
-		var effectiveFirstAdvanceDuration *int
-		var effectiveFirstAdvanceDurationSrc string
+		var effectiveFirstPrepTime *string
+		var effectiveFirstPrepTimeSrc string
+		var effectiveFirstPrepDuration *int
+		var effectiveFirstPrepDurationSrc string
 		if rangeEntry != nil {
-			if rangeEntry.FirstShiftAdvanceTime != nil {
-				effectiveFirstAdvanceTime = rangeEntry.FirstShiftAdvanceTime
-				effectiveFirstAdvanceTimeSrc = rangeEntry.FirstShiftAdvanceTimeSrc
+			if rangeEntry.FirstShiftPreparationTime != nil {
+				effectiveFirstPrepTime = rangeEntry.FirstShiftPreparationTime
+				effectiveFirstPrepTimeSrc = rangeEntry.FirstShiftPreparationTimeSrc
 			}
-			if rangeEntry.FirstShiftAdvanceDuration != nil {
-				effectiveFirstAdvanceDuration = rangeEntry.FirstShiftAdvanceDuration
-				effectiveFirstAdvanceDurationSrc = rangeEntry.FirstShiftAdvanceDurationSrc
+			if rangeEntry.FirstShiftPreparationDuration != nil {
+				effectiveFirstPrepDuration = rangeEntry.FirstShiftPreparationDuration
+				effectiveFirstPrepDurationSrc = rangeEntry.FirstShiftPreparationDurationSrc
 			}
 		}
-		if effectiveFirstAdvanceTime == nil && hasShift && shift.FirstShiftAdvanceTime != nil {
-			effectiveFirstAdvanceTime = shift.FirstShiftAdvanceTime
-			effectiveFirstAdvanceTimeSrc = "" // ShiftType level
+		if effectiveFirstPrepTime == nil && hasShift && shift.FirstShiftPreparationTime != nil {
+			effectiveFirstPrepTime = shift.FirstShiftPreparationTime
+			effectiveFirstPrepTimeSrc = "" // ShiftType level
 		}
-		if effectiveFirstAdvanceDuration == nil && hasShift && shift.FirstShiftAdvanceDuration != nil {
-			effectiveFirstAdvanceDuration = shift.FirstShiftAdvanceDuration
-			effectiveFirstAdvanceDurationSrc = "" // ShiftType level
+		if effectiveFirstPrepDuration == nil && hasShift && shift.FirstShiftPreparationDuration != nil {
+			effectiveFirstPrepDuration = shift.FirstShiftPreparationDuration
+			effectiveFirstPrepDurationSrc = "" // ShiftType level
 		}
-		if effectiveFirstAdvanceTime != nil && effectiveFirstAdvanceDuration != nil && !warnedCrossLevel[p.Code] {
+		if effectiveFirstPrepTime != nil && effectiveFirstPrepDuration != nil && !warnedCrossLevel[p.Code] {
 			warnedCrossLevel[p.Code] = true
-			timeInfo := lineForShiftField(p.Code, effectiveFirstAdvanceTimeSrc, "first_shift_advance_time", lines)
-			advInfo := lineForShiftField(p.Code, effectiveFirstAdvanceDurationSrc, "first_shift_advance_duration", lines)
-			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_advance_time%s and first_shift_advance_duration%s set at different levels; first_shift_advance_time prevails\n",
+			timeInfo := lineForShiftField(p.Code, effectiveFirstPrepTimeSrc, "first_shift_preparation_time", lines)
+			advInfo := lineForShiftField(p.Code, effectiveFirstPrepDurationSrc, "first_shift_preparation_duration", lines)
+			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_preparation_time%s and first_shift_preparation_duration%s set at different levels; first_shift_preparation_time prevails\n",
 				p.Code, timeInfo, advInfo)
 		}
 
@@ -161,26 +161,30 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		var advance int
 		if isFirstShift {
 			switch {
-			case effectiveFirstAdvanceTime != nil:
-				ft, err := time.Parse("15:04", *effectiveFirstAdvanceTime)
+			case effectiveFirstPrepTime != nil:
+				ft, err := time.Parse("15:04", *effectiveFirstPrepTime)
 				if err != nil {
-					return nil, fmt.Errorf("shift %s: invalid first_shift_advance_time %q: %v", p.Code, *effectiveFirstAdvanceTime, err)
+					return nil, fmt.Errorf("shift %s: invalid first_shift_preparation_time %q: %v", p.Code, *effectiveFirstPrepTime, err)
 				}
 				firstTimeMinutes := ft.Hour()*60 + ft.Minute()
 				departureMinutes := p.Hour*60 + p.Min
 				if firstTimeMinutes >= departureMinutes {
-					lineInfo := lineForShiftField(p.Code, effectiveFirstAdvanceTimeSrc, "first_shift_advance_time", lines)
-					return nil, fmt.Errorf("shift %s on %s: first_shift_advance_time %q%s is at or after departure %02d:%02d",
-						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstAdvanceTime, lineInfo, p.Hour, p.Min)
+					lineInfo := lineForShiftField(p.Code, effectiveFirstPrepTimeSrc, "first_shift_preparation_time", lines)
+					return nil, fmt.Errorf("shift %s on %s: first_shift_preparation_time %q%s is at or after departure %02d:%02d",
+						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstPrepTime, lineInfo, p.Hour, p.Min)
 				}
 				advance = departureMinutes - firstTimeMinutes
-			case effectiveFirstAdvanceDuration != nil:
-				advance = *effectiveFirstAdvanceDuration
+			case effectiveFirstPrepDuration != nil:
+				advance = *effectiveFirstPrepDuration
 			default:
-				advance = defaultAdvanceMinutes
+				if prep := schedule.GetShiftPreparationDuration(shift, rangeEntry); prep != nil {
+					advance = *prep
+				} else {
+					advance = defaultAdvanceMinutes
+				}
 			}
 		} else {
-			if prep := schedule.GetShiftPreparation(shift, rangeEntry); prep != nil {
+			if prep := schedule.GetShiftPreparationDuration(shift, rangeEntry); prep != nil {
 				advance = *prep
 			} else {
 				advance = defaultAdvanceMinutes

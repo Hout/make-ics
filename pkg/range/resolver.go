@@ -15,16 +15,16 @@ import (
 // struct that contributed that field, for line-number annotations in warnings
 // and errors. An empty string means ShiftType level.
 type ResolvedRange struct {
-	Trips                        *int
-	TripDuration                 *int
-	BreakDuration                *int
-	FirstShiftAdvanceDuration    *int
-	FirstShiftAdvanceTime        *string
-	FirstShiftCount              *int
-	LastAftercare                *int
-	ShiftPreparation             *int
-	FirstShiftAdvanceDurationSrc string // relative path of struct that set FirstShiftAdvanceDuration
-	FirstShiftAdvanceTimeSrc     string // relative path of struct that set FirstShiftAdvanceTime
+	Trips                            *int
+	TripDuration                     *int
+	BreakDuration                    *int
+	FirstShiftPreparationDuration    *int
+	FirstShiftPreparationTime        *string
+	FirstShiftPreparationCount       *int
+	LastAftercare                    *int
+	ShiftPreparationDuration         *int
+	FirstShiftPreparationDurationSrc string // relative path of struct that set FirstShiftPreparationDuration
+	FirstShiftPreparationTimeSrc     string // relative path of struct that set FirstShiftPreparationTime
 }
 
 // containsWeekday reports whether the abbreviation of wd (e.g. "Tue") is present
@@ -97,20 +97,20 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 // line-number annotation of source fields.
 func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
 	rr := ResolvedRange{
-		Trips:                     slot.Trips,
-		TripDuration:              slot.TripDuration,
-		BreakDuration:             slot.BreakDuration,
-		FirstShiftAdvanceDuration: slot.FirstShiftAdvanceDuration,
-		FirstShiftAdvanceTime:     slot.FirstShiftAdvanceTime,
-		FirstShiftCount:           slot.FirstShiftCount,
-		LastAftercare:             slot.LastAftercare,
-		ShiftPreparation:          slot.ShiftPreparation,
+		Trips:                         slot.Trips,
+		TripDuration:                  slot.TripDuration,
+		BreakDuration:                 slot.BreakDuration,
+		FirstShiftPreparationDuration: slot.FirstShiftPreparationDuration,
+		FirstShiftPreparationTime:     slot.FirstShiftPreparationTime,
+		FirstShiftPreparationCount:    slot.FirstShiftPreparationCount,
+		LastAftercare:                 slot.LastAftercare,
+		ShiftPreparationDuration:      slot.ShiftPreparationDuration,
 	}
-	if slot.FirstShiftAdvanceDuration != nil {
-		rr.FirstShiftAdvanceDurationSrc = slotPath
+	if slot.FirstShiftPreparationDuration != nil {
+		rr.FirstShiftPreparationDurationSrc = slotPath
 	}
-	if slot.FirstShiftAdvanceTime != nil {
-		rr.FirstShiftAdvanceTimeSrc = slotPath
+	if slot.FirstShiftPreparationTime != nil {
+		rr.FirstShiftPreparationTimeSrc = slotPath
 	}
 	return rr
 }

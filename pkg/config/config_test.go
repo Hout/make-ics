@@ -61,7 +61,7 @@ func TestValidateConfig_BothFirstShiftFieldsOnShiftType(t *testing.T) {
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftAdvanceDuration: &adv, FirstShiftAdvanceTime: &ft},
+			"A": {FirstShiftPreparationDuration: &adv, FirstShiftPreparationTime: &ft},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
@@ -80,7 +80,7 @@ func TestValidateConfig_BothFirstShiftFieldsOnSlot(t *testing.T) {
 		ShiftType: map[string]model.ShiftType{
 			"A": {Schedules: []model.Schedule{{
 				Seasons: []string{"s"},
-				Slots:   []model.Slot{{FirstShiftAdvanceDuration: &adv, FirstShiftAdvanceTime: &ft}},
+				Slots:   []model.Slot{{FirstShiftPreparationDuration: &adv, FirstShiftPreparationTime: &ft}},
 			}}},
 		},
 	}
@@ -95,11 +95,11 @@ func TestValidateConfig_InvalidFirstShiftTimeFormat(t *testing.T) {
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftAdvanceTime: &ft},
+			"A": {FirstShiftPreparationTime: &ft},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error for invalid first_shift_time format")
+		t.Fatalf("expected error for invalid first_shift_preparation_time format")
 	}
 }
 
@@ -112,7 +112,7 @@ func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
 		Seasons:  map[string]model.Season{"s": {from}},
 		ShiftType: map[string]model.ShiftType{
 			"A": {
-				FirstShiftAdvanceTime: &ft,
+				FirstShiftPreparationTime: &ft,
 				Schedules: []model.Schedule{{
 					Seasons: []string{"s"},
 					Slots:   []model.Slot{{}},

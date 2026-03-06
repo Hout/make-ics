@@ -32,21 +32,22 @@ shift_type:
     trips: 3
     trip_duration: 50
     break_duration: 30
-    first_shift_advance_duration: 30
+    preparation_duration: 30
+    first_shift_preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen]
         slots:
           - weekdays: *wkdays
-            first_shift_advance_time: "9:15"
-            first_shift_count: 2
+            first_shift_preparation_time: "9:15"
+            first_shift_preparation_count: 2
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
               - times: ["14:40", "15:00"]
                 trips: 2
           - weekdays: *weekend
-            first_shift_advance_time: "9:15"
-            first_shift_count: 2
+            first_shift_preparation_time: "9:15"
+            first_shift_preparation_count: 2
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
@@ -57,8 +58,8 @@ shift_type:
       - seasons: [middenseizoen]
         slots:
           - weekdays: *no_mon
-            first_shift_advance_time: "9:15"
-            first_shift_count: 2
+            first_shift_preparation_time: "9:15"
+            first_shift_preparation_count: 2
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
@@ -67,7 +68,7 @@ shift_type:
       - seasons: [hoogseizoen]
         slots:
           - weekdays: *no_mon
-            first_shift_advance_time: "9:15"
+            first_shift_preparation_time: "9:15"
             start_times:
               - times: ["10:00", "10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
@@ -79,7 +80,7 @@ shift_type:
     trips: 2
     trip_duration: 50
     break_duration: 30
-    first_shift_advance_duration: 30
+    preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
@@ -104,7 +105,8 @@ shift_type:
     trips: 2
     trip_duration: 75
     break_duration: 30
-    first_shift_advance_duration: 60
+    preparation_duration: 30
+    first_shift_preparation_duration: 60
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
@@ -118,7 +120,8 @@ shift_type:
     trips: 2
     trip_duration: 75
     break_duration: 30
-    first_shift_advance_duration: 30
+    preparation_duration: 30
+    first_shift_preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
@@ -131,7 +134,7 @@ shift_type:
     description: "Binnendieze; Hertogstadroute"
     trips: 1
     trip_duration: 90
-    first_shift_advance_duration: 30
+    first_shift_preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
@@ -152,7 +155,7 @@ shift_type:
     description: "Binnendieze; Kruithuisroute"
     trips: 1
     trip_duration: 50
-    first_shift_advance_duration: 30
+    first_shift_preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
@@ -165,7 +168,7 @@ shift_type:
     description: "Binnendieze; Walschipper"
     trips: 1
     trip_duration: 180
-    first_shift_advance_duration: 30
+    first_shift_preparation_duration: 30
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]

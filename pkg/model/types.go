@@ -23,16 +23,16 @@ type Season []DateRange
 
 // Slot defines the scheduling parameters for a specific weekday set within a Schedule.
 type Slot struct {
-	Weekdays                  []string         `yaml:"weekdays,omitempty"`
-	Trips                     *int             `yaml:"trips,omitempty"`
-	TripDuration              *int             `yaml:"trip_duration,omitempty"`
-	BreakDuration             *int             `yaml:"break_duration,omitempty"`
-	FirstShiftAdvanceDuration *int             `yaml:"first_shift_advance_duration,omitempty"`
-	FirstShiftAdvanceTime     *string          `yaml:"first_shift_advance_time,omitempty"`
-	FirstShiftCount           *int             `yaml:"first_shift_count,omitempty"`
-	LastAftercare             *int             `yaml:"last_shift_aftercare,omitempty"`
-	ShiftPreparation          *int             `yaml:"shift_preparation,omitempty"`
-	StartTimes                []StartTimeGroup `yaml:"start_times,omitempty"`
+	Weekdays                      []string         `yaml:"weekdays,omitempty"`
+	Trips                         *int             `yaml:"trips,omitempty"`
+	TripDuration                  *int             `yaml:"trip_duration,omitempty"`
+	BreakDuration                 *int             `yaml:"break_duration,omitempty"`
+	FirstShiftPreparationDuration *int             `yaml:"first_shift_preparation_duration,omitempty"`
+	FirstShiftPreparationTime     *string          `yaml:"first_shift_preparation_time,omitempty"`
+	FirstShiftPreparationCount    *int             `yaml:"first_shift_preparation_count,omitempty"`
+	LastAftercare                 *int             `yaml:"last_shift_aftercare,omitempty"`
+	ShiftPreparationDuration      *int             `yaml:"shift_preparation_duration,omitempty"`
+	StartTimes                    []StartTimeGroup `yaml:"start_times,omitempty"`
 }
 
 // Schedule associates one or more named seasons with a set of weekday Slots.
@@ -43,17 +43,17 @@ type Schedule struct {
 
 // ShiftType holds the scheduling parameters for a named shift code.
 type ShiftType struct {
-	Summary                   string     `yaml:"summary,omitempty"`
-	Description               string     `yaml:"description,omitempty"`
-	Trips                     *int       `yaml:"trips,omitempty"`
-	TripDuration              *int       `yaml:"trip_duration,omitempty"`
-	BreakDuration             *int       `yaml:"break_duration,omitempty"`
-	FirstShiftAdvanceDuration *int       `yaml:"first_shift_advance_duration,omitempty"`
-	FirstShiftAdvanceTime     *string    `yaml:"first_shift_advance_time,omitempty"`
-	FirstShiftCount           *int       `yaml:"first_shift_count,omitempty"`
-	LastShiftAftercare        *int       `yaml:"last_shift_aftercare,omitempty"`
-	ShiftPreparation          *int       `yaml:"shift_preparation,omitempty"`
-	Schedules                 []Schedule `yaml:"schedules,omitempty"`
+	Summary                       string     `yaml:"summary,omitempty"`
+	Description                   string     `yaml:"description,omitempty"`
+	Trips                         *int       `yaml:"trips,omitempty"`
+	TripDuration                  *int       `yaml:"trip_duration,omitempty"`
+	BreakDuration                 *int       `yaml:"break_duration,omitempty"`
+	FirstShiftPreparationDuration *int       `yaml:"first_shift_preparation_duration,omitempty"`
+	FirstShiftPreparationTime     *string    `yaml:"first_shift_preparation_time,omitempty"`
+	FirstShiftPreparationCount    *int       `yaml:"first_shift_preparation_count,omitempty"`
+	LastShiftAftercare            *int       `yaml:"last_shift_aftercare,omitempty"`
+	ShiftPreparationDuration      *int       `yaml:"shift_preparation_duration,omitempty"`
+	Schedules                     []Schedule `yaml:"schedules,omitempty"`
 }
 
 // Exception remaps a specific calendar date to a different weekday for schedule

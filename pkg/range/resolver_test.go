@@ -84,7 +84,7 @@ func TestFindSchedule_StartTimeMismatchReturnsEntry(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	grp := model.StartTimeGroup{Times: []string{"14:40"}, Trips: &groupTrips}
-	slot := model.Slot{FirstShiftAdvanceDuration: &adv, StartTimes: []model.StartTimeGroup{grp}}
+	slot := model.Slot{FirstShiftPreparationDuration: &adv, StartTimes: []model.StartTimeGroup{grp}}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
 
@@ -283,11 +283,11 @@ func TestFindSchedule_ExceptionRemapsWeekday(t *testing.T) {
 	}
 }
 
-func TestFindSchedule_FirstShiftTimeFromSlot(t *testing.T) {
+func TestFindSchedule_FirstShiftPreparationTimeFromSlot(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	ft := "09:30"
-	slot := model.Slot{FirstShiftAdvanceTime: &ft}
+	slot := model.Slot{FirstShiftPreparationTime: &ft}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
 
@@ -295,16 +295,16 @@ func TestFindSchedule_FirstShiftTimeFromSlot(t *testing.T) {
 	if rr == nil {
 		t.Fatalf("expected resolved range")
 	}
-	if rr.FirstShiftAdvanceTime == nil || *rr.FirstShiftAdvanceTime != "09:30" {
-		t.Fatalf("expected FirstShiftTime=09:30, got %v", rr.FirstShiftAdvanceTime)
+	if rr.FirstShiftPreparationTime == nil || *rr.FirstShiftPreparationTime != "09:30" {
+		t.Fatalf("expected FirstShiftPreparationTime=09:30, got %v", rr.FirstShiftPreparationTime)
 	}
 }
 
-func TestFindSchedule_FirstShiftCountFromSlot(t *testing.T) {
+func TestFindSchedule_FirstShiftPreparationCountFromSlot(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	count := 2
-	slot := model.Slot{FirstShiftCount: &count}
+	slot := model.Slot{FirstShiftPreparationCount: &count}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
 
@@ -312,7 +312,7 @@ func TestFindSchedule_FirstShiftCountFromSlot(t *testing.T) {
 	if rr == nil {
 		t.Fatalf("expected resolved range")
 	}
-	if rr.FirstShiftCount == nil || *rr.FirstShiftCount != 2 {
-		t.Fatalf("expected FirstShiftCount=2, got %v", rr.FirstShiftCount)
+	if rr.FirstShiftPreparationCount == nil || *rr.FirstShiftPreparationCount != 2 {
+		t.Fatalf("expected FirstShiftPreparationCount=2, got %v", rr.FirstShiftPreparationCount)
 	}
 }

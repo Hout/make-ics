@@ -22,10 +22,10 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	f.SetCellValue(sheet, "B2", "A")
 	f.SetCellValue(sheet, "C2", "12:00")
 
-	// shift type with first_shift_advance=45 and last_shift_aftercare=30
+	// shift type with first_shift_preparation_duration=45 and last_shift_aftercare=30
 	adv := 45
 	rem := 30
-	st := model.ShiftType{Summary: "A Shift", FirstShiftAdvanceDuration: &adv, LastShiftAftercare: &rem}
+	st := model.ShiftType{Summary: "A Shift", FirstShiftPreparationDuration: &adv, LastShiftAftercare: &rem}
 	shifts := map[string]model.ShiftType{"A": st}
 
 	loc, _ := i18n.NewLocalizer("nl")
@@ -209,10 +209,10 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 	}
 	shifts := map[string]model.ShiftType{
 		"KHR_": {
-			Summary:                   "KHR",
-			FirstShiftAdvanceDuration: &adv,
-			LastShiftAftercare:        &rem,
-			Schedules:                 []model.Schedule{sunOnlySched},
+			Summary:                       "KHR",
+			FirstShiftPreparationDuration: &adv,
+			LastShiftAftercare:            &rem,
+			Schedules:                     []model.Schedule{sunOnlySched},
 		},
 	}
 	exceptions := map[string]model.Exception{
@@ -265,7 +265,7 @@ func TestIterEvents_FirstShiftCount(t *testing.T) {
 
 	adv := 45
 	count := 2
-	st := model.ShiftType{FirstShiftAdvanceDuration: &adv, FirstShiftCount: &count}
+	st := model.ShiftType{FirstShiftPreparationDuration: &adv, FirstShiftPreparationCount: &count}
 	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err != nil {
@@ -301,7 +301,7 @@ func TestIterEvents_FirstShiftTime(t *testing.T) {
 	f.SetCellValue(s, "C2", "12:00")
 
 	ft := "09:15" // advance for 10:00 departure = 45m; 12:00 uses default
-	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
+	st := model.ShiftType{FirstShiftPreparationTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err != nil {
@@ -331,7 +331,7 @@ func TestIterEvents_FirstShiftTimeAtOrAfterDeparture_Error(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00")
 
 	ft := "10:00" // equal to departure → must error
-	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
+	st := model.ShiftType{FirstShiftPreparationTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err == nil {
@@ -347,7 +347,7 @@ func TestIterEvents_FirstShiftTimeAfterDeparture_Error(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00")
 
 	ft := "11:00" // after departure → must error
-	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
+	st := model.ShiftType{FirstShiftPreparationTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err == nil {
@@ -359,7 +359,7 @@ func TestIterEvents_FirstShiftDeterminedByScheduleNotPosition(t *testing.T) {
 	// The slot defines morning times (10:20, 10:40) as the only scheduled start
 	// times. A person assigned only 14:40 is NOT the "first shift of the day"
 	// according to the schedule — 10:20 and 10:40 are — so they should NOT get
-	// the first_shift_advance_time prep; they get the default advance instead.
+	// the first_shift_preparation_time prep; they get the default advance instead.
 	from := model.DateRange{
 		From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
 		To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
@@ -368,7 +368,7 @@ func TestIterEvents_FirstShiftDeterminedByScheduleNotPosition(t *testing.T) {
 	ft := "09:15"
 	shifts := map[string]model.ShiftType{
 		"A": {
-			FirstShiftAdvanceTime: &ft,
+			FirstShiftPreparationTime: &ft,
 			Schedules: []model.Schedule{{
 				Seasons: []string{"s"},
 				Slots: []model.Slot{{
@@ -417,9 +417,34 @@ func TestIterEvents_FirstShiftDeterminedByScheduleNotPosition(t *testing.T) {
 	if len(events2) != 1 {
 		t.Fatalf("expected 1 event got %d", len(events2))
 	}
-	// 10:20 IS a first scheduled time → first_shift_advance_time "9:15"
+	// 10:20 IS a first scheduled time → first_shift_preparation_time "9:15"
 	wantStart2 := time.Date(2026, 4, 3, 9, 15, 0, 0, tz)
 	if !events2[0].DtStart.Equal(wantStart2) {
 		t.Fatalf("morning shift: DtStart want %v got %v", wantStart2, events2[0].DtStart)
+	}
+}
+
+func TestIterEvents_FirstShiftFallsBackToShiftPreparationDuration(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "10:00")
+
+	prep := 20
+	st := model.ShiftType{ShiftPreparationDuration: &prep}
+	loc, _ := i18n.NewLocalizer("en")
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event got %d", len(events))
+	}
+	tz := events[0].DtStart.Location()
+	// first shift, no first_shift_preparation_*, falls back to shift_preparation_duration=20
+	wantStart := time.Date(2026, 4, 3, 10, 0, 0, 0, tz).Add(-20 * time.Minute)
+	if !events[0].DtStart.Equal(wantStart) {
+		t.Fatalf("first shift fallback: DtStart want %v got %v", wantStart, events[0].DtStart)
 	}
 }
