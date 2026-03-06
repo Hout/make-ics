@@ -1,0 +1,44 @@
+# Caddy reverse-proxy configuration for the make-ics web server.
+#
+# Usage (after building the Go binary):
+#   go build -o make-ics-web ./cmd/web
+#   ./make-ics-web -port 8080 &
+#   caddy run --config Caddyfile
+#
+# Caddy provisions and renews TLS certificates automatically via Let's Encrypt.
+# Replace example.com with your actual domain, or use ":80" for plain HTTP.
+
+example.com {
+    # Allow xlsx uploads up to 10 MB (matches the Go server's MaxBytesReader).
+    request_body {
+        max_size 10MB
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options  "nosniff"
+        X-Frame-Options         "DENY"
+        Referrer-Policy         "no-referrer"
+        Permissions-Policy      "geolocation=()"
+        # Remove the Server header to avoid fingerprinting.
+        -Server
+    }
+
+    # Proxy everything to the Go web server.
+    reverse_proxy 127.0.0.1:8080 {
+        # Stream the ICS response back to the browser without buffering.
+        flush_interval -1
+
+        # Propagate the real client address to the Go server.
+        header_up X-Real-IP        {remote_host}
+        header_up X-Forwarded-For  {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        transport http {
+            # The /convert endpoint may take a moment to parse a large xlsx file.
+            read_buffer_size  16KB
+            dial_timeout      5s
+            response_header_timeout 60s
+        }
+    }
+}
