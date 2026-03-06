@@ -26,9 +26,9 @@ type Event struct {
 }
 
 // IterEvents reads the first sheet of the workbook and returns generated events.
-// It applies scheduling rules from shiftTypes, uses date-range overrides,
+// It applies scheduling rules from shiftTypes, uses schedule/slot overrides,
 // and produces localized descriptions via the provided Localizer.
-func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, exceptions map[string]model.Exception, loc *i18n.Localizer) ([]Event, error) {
+func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, seasons map[string]model.Season, exceptions map[string]model.Exception, loc *i18n.Localizer) ([]Event, error) {
 	sheet := f.GetSheetName(0)
 	rows, err := f.GetRows(sheet)
 	if err != nil {
@@ -95,7 +95,7 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		shift, hasShift := shiftTypes[p.Code]
 		startTime := fmt.Sprintf("%02d:%02d", p.Hour, p.Min)
 		eff := dr.EffectiveWeekday(p.Date, exceptions)
-		rangeEntry := dr.FindDateRange(shift.DateRanges, p.Date, startTime, eff)
+		rangeEntry := dr.FindSchedule(shift.Schedules, p.Date, startTime, eff, seasons)
 
 		// advance precedence
 		var advance int

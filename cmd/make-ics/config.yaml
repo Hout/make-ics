@@ -8,15 +8,22 @@ exceptions:
     description: "Pasen"
     weekday: "Sun"
 
-# YAML anchors — these keys are ignored by the Go model.
-_periods:
-  - &spring_early {from: 2026-04-01, to: 2026-04-17}
-  - &spring_late  {from: 2026-04-18, to: 2026-06-28}
-  - &spring_full  {from: 2026-04-01, to: 2026-06-28}
-  - &summer       {from: 2026-06-29, to: 2026-08-31}
-  - &autumn       {from: 2026-09-01, to: 2026-10-31}
-  - &full_season  {from: 2026-04-01, to: 2026-10-31}
+# Named seasons: each season is a list of {from, to} date windows.
+seasons:
+  spring_early:
+    - {from: 2026-04-01, to: 2026-04-17}
+  spring_late:
+    - {from: 2026-04-18, to: 2026-06-28}
+  spring_full:
+    - {from: 2026-04-01, to: 2026-06-28}
+  summer:
+    - {from: 2026-06-29, to: 2026-08-31}
+  autumn:
+    - {from: 2026-09-01, to: 2026-10-31}
+  full_season:
+    - {from: 2026-04-01, to: 2026-10-31}
 
+# YAML anchors for weekday lists — these keys are ignored by the Go model.
 _weekdays:
   no_mon:  &no_mon  ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   wkdays:  &wkdays  ["Tue", "Wed", "Thu", "Fri"]
@@ -32,65 +39,64 @@ shift_type:
     break_duration: 30
     first_shift_advance: 45
     last_shift_remains: 30
-    date_ranges:
-      - <<: *spring_early
-        weekdays: *wkdays
-        start_times:
-          - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
-          - times: ["14:40", "15:00"]
-            trips: 2
-      - <<: *spring_early
-        weekdays: *weekend
-        start_times:
-          - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
-      - <<: *spring_early
-        weekdays: *mon
-        start_times:
-          - times: ["14:00", "14:20"]
-          - times: ["14:40", "15:00"]
-            trips: 2
-      - <<: *spring_late
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40"]
-          - times: ["15:00"]
-            trips: 2
-      - <<: *spring_late
-        weekdays: *mon
-        start_times:
-          - times: ["14:00"]
-            trips: 3
-          - times: ["14:20", "14:40", "15:00"]
-      - <<: *summer
-        weekdays: *no_mon
-        first_shift_advance: 60
-        start_times:
-          - times: ["10:20", "11:00", "14:00", "15:00"]
-            trips: 3
-          - times: ["10:00", "10:40", "11:20", "14:20", "14:40"]
-      - <<: *summer
-        weekdays: *mon
-        start_times:
-          - times: ["14:00", "15:00"]
-            trips: 3
-          - times: ["14:20", "14:40"]
-      - <<: *autumn
-        weekdays: *no_mon
-        first_shift_advance: 30
-        start_times:
-          - times: ["10:20", "14:40"]
-            trips: 1
-          - times: ["10:40", "11:00", "14:00", "14:20"]
-          - times: ["15:00"]
-            trips: 2
-      - <<: *autumn
-        weekdays: *mon
-        start_times:
-          - times: ["14:00", "14:20"]
-          - times: ["14:40"]
-            trips: 1
-          - times: ["15:00"]
-            trips: 2
+    schedules:
+      - seasons: [spring_early]
+        slots:
+          - weekdays: *wkdays
+            start_times:
+              - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
+              - times: ["14:40", "15:00"]
+                trips: 2
+          - weekdays: *weekend
+            start_times:
+              - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
+          - weekdays: *mon
+            start_times:
+              - times: ["14:00", "14:20"]
+              - times: ["14:40", "15:00"]
+                trips: 2
+      - seasons: [spring_late]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40"]
+              - times: ["15:00"]
+                trips: 2
+          - weekdays: *mon
+            start_times:
+              - times: ["14:00"]
+                trips: 3
+              - times: ["14:20", "14:40", "15:00"]
+      - seasons: [summer]
+        slots:
+          - weekdays: *no_mon
+            first_shift_advance: 60
+            start_times:
+              - times: ["10:20", "11:00", "14:00", "15:00"]
+                trips: 3
+              - times: ["10:00", "10:40", "11:20", "14:20", "14:40"]
+          - weekdays: *mon
+            start_times:
+              - times: ["14:00", "15:00"]
+                trips: 3
+              - times: ["14:20", "14:40"]
+      - seasons: [autumn]
+        slots:
+          - weekdays: *no_mon
+            first_shift_advance: 30
+            start_times:
+              - times: ["10:20", "14:40"]
+                trips: 1
+              - times: ["10:40", "11:00", "14:00", "14:20"]
+              - times: ["15:00"]
+                trips: 2
+          - weekdays: *mon
+            start_times:
+              - times: ["14:00", "14:20"]
+              - times: ["14:40"]
+                trips: 1
+              - times: ["15:00"]
+                trips: 2
   HRv_:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
@@ -99,31 +105,23 @@ shift_type:
     break_duration: 30
     first_shift_advance: 30
     last_shift_remains: 30
-    date_ranges:
-      - <<: *spring_full
-        weekdays: *wkdays
-        start_times:
-          - times: ["13:15", "15:15"]
-      - <<: *spring_full
-        weekdays: *weekend
-        start_times:
-          - times: ["11:15", "13:15", "15:15"]
-      - <<: *summer
-        weekdays: *no_mon
-        start_times:
-          - times: ["11:15", "13:15", "15:15"]
-      - <<: *summer
-        weekdays: *mon
-        start_times:
-          - times: ["15:15"]
-      - <<: *autumn
-        weekdays: *wkdays
-        start_times:
-          - times: ["13:15", "15:15"]
-      - <<: *autumn
-        weekdays: *weekend
-        start_times:
-          - times: ["11:15", "13:15", "15:15"]
+    schedules:
+      - seasons: [spring_full, autumn]
+        slots:
+          - weekdays: *wkdays
+            start_times:
+              - times: ["13:15", "15:15"]
+          - weekdays: *weekend
+            start_times:
+              - times: ["11:15", "13:15", "15:15"]
+      - seasons: [summer]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["11:15", "13:15", "15:15"]
+          - weekdays: *mon
+            start_times:
+              - times: ["15:15"]
   VRk_:
     summary: "Binnendieze VRK"
     description: "Binnendieze; Vestingroute Koninginnesteiger"
@@ -132,11 +130,12 @@ shift_type:
     break_duration: 30
     first_shift_advance: 60
     last_shift_remains: 30
-    date_ranges:
-      - <<: *full_season
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:15", "13:45"]
+    schedules:
+      - seasons: [full_season]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:15", "13:45"]
   JBRv:
     summary: "Binnendieze JBRV"
     description: "Binnendieze; Jeroen Boschroute Voldersgat"
@@ -145,11 +144,12 @@ shift_type:
     break_duration: 30
     first_shift_advance: 30
     last_shift_remains: 30
-    date_ranges:
-      - <<: *full_season
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:15", "13:45"]
+    schedules:
+      - seasons: [full_season]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:15", "13:45"]
   HTS_:
     summary: "Binnendieze HTS"
     description: "Binnendieze; Hertogstadroute"
@@ -157,23 +157,20 @@ shift_type:
     trip_duration: 90
     first_shift_advance: 30
     last_shift_remains: 30
-    date_ranges:
-      - <<: *spring_full
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:30", "10:45", "12:50", "13:05"]
-      - <<: *summer
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]
-      - <<: *summer
-        weekdays: *mon
-        start_times:
-          - times: ["15:10", "15:25"]
-      - <<: *autumn
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:30", "10:45", "12:50", "13:05"]
+    schedules:
+      - seasons: [spring_full, autumn]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:30", "10:45", "12:50", "13:05"]
+      - seasons: [summer]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]
+          - weekdays: *mon
+            start_times:
+              - times: ["15:10", "15:25"]
   KHR_:
     summary: "Binnendieze KHR"
     description: "Binnendieze; Kruithuisroute"
@@ -181,11 +178,12 @@ shift_type:
     trip_duration: 50
     first_shift_advance: 30
     last_shift_remains: 30
-    date_ranges:
-      - <<: *full_season
-        weekdays: *weekend
-        start_times:
-          - times: ["12:10"]
+    schedules:
+      - seasons: [full_season]
+        slots:
+          - weekdays: *weekend
+            start_times:
+              - times: ["12:10"]
   WS__:
     summary: "Binnendieze WS"
     description: "Binnendieze; Walschipper"
@@ -193,12 +191,13 @@ shift_type:
     trip_duration: 180
     first_shift_advance: 30
     last_shift_remains: 30
-    date_ranges:
-      - <<: *full_season
-        weekdays: *no_mon
-        start_times:
-          - times: ["10:00", "14:00"]
-      - <<: *full_season
-        weekdays: *mon
-        start_times:
-          - times: ["14:00"]
+    schedules:
+      - seasons: [full_season]
+        slots:
+          - weekdays: *no_mon
+            start_times:
+              - times: ["10:00", "14:00"]
+          - weekdays: *mon
+            start_times:
+              - times: ["14:00"]
+

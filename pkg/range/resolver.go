@@ -7,8 +7,8 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
-// ResolvedRange represents the merged result of a DateRange and an optional
-// StartTimeGroup overrides. Fields are pointers to distinguish missing values.
+// ResolvedRange represents the merged result of a Schedule Slot and an optional
+// StartTimeGroup override. Fields are pointers to distinguish missing values.
 type ResolvedRange struct {
 	Trips         *int
 	TripDuration  *int
@@ -65,66 +65,77 @@ func EffectiveWeekday(date time.Time, exceptions map[string]model.Exception) tim
 	return date.Weekday()
 }
 
-// resolvedFromEntry builds a ResolvedRange populated from the entry-level fields.
-func resolvedFromEntry(entry model.DateRange) ResolvedRange {
+// dateInSchedule reports whether date falls within any DateRange window of
+// any season referenced by sched.
+func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]model.Season) bool {
+	d := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	for _, name := range sched.Seasons {
+		for _, sr := range seasons[name] {
+			f := time.Date(sr.From.Year(), sr.From.Month(), sr.From.Day(), 0, 0, 0, 0, time.UTC)
+			t := time.Date(sr.To.Year(), sr.To.Month(), sr.To.Day(), 0, 0, 0, 0, time.UTC)
+			if !d.Before(f) && !d.After(t) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
+func resolvedFromSlot(slot model.Slot) ResolvedRange {
 	return ResolvedRange{
-		Trips:         entry.Trips,
-		TripDuration:  entry.TripDuration,
-		BreakDuration: entry.BreakDuration,
-		FirstAdvance:  entry.FirstAdvance,
-		LastRemains:   entry.LastRemains,
+		Trips:         slot.Trips,
+		TripDuration:  slot.TripDuration,
+		BreakDuration: slot.BreakDuration,
+		FirstAdvance:  slot.FirstAdvance,
+		LastRemains:   slot.LastRemains,
 	}
 }
 
-// FindDateRange finds the first date range covering apptDate. If a start_time
-// matches a group's Times, the group's fields override the entry-level fields.
-// A non-empty weekdays list restricts the range to those days of the week.
+// FindSchedule finds the first schedule whose seasons cover apptDate, then the
+// first slot within that schedule whose weekday set contains effectiveWeekday.
+// If a start_time matches a group's Times, the group's fields override the
+// slot-level fields. An empty weekdays list on a slot means all days are allowed.
 // effectiveWeekday is used for weekday matching instead of apptDate.Weekday(),
 // allowing exception dates to be treated as a different day of the week.
-// Returns nil when no range matches.
-func FindDateRange(dateRanges []model.DateRange, apptDate time.Time, startTime string, effectiveWeekday time.Weekday) *ResolvedRange {
-	for _, entry := range dateRanges {
-		from := entry.From
-		to := entry.To
-		// normalize date-only comparison
-		d := time.Date(apptDate.Year(), apptDate.Month(), apptDate.Day(), 0, 0, 0, 0, time.UTC)
-		f := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC)
-		t := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, time.UTC)
-		if d.Before(f) || d.After(t) {
+// Returns nil when no schedule/slot matches.
+func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime string, effectiveWeekday time.Weekday, seasons map[string]model.Season) *ResolvedRange {
+	for _, sched := range schedules {
+		if !dateInSchedule(apptDate, sched, seasons) {
 			continue
 		}
-		// if weekdays are specified, skip entries that don't match
-		if len(entry.Weekdays) > 0 && !containsWeekday(entry.Weekdays, effectiveWeekday) {
-			continue
-		}
-		// if startTime provided, check groups
-		if startTime != "" {
-			for _, g := range entry.StartTimes {
-				for _, tm := range g.Times {
-					if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
-						rr := resolvedFromEntry(entry)
-						if g.Trips != nil {
-							rr.Trips = g.Trips
+		for _, slot := range sched.Slots {
+			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
+				continue
+			}
+			if startTime != "" {
+				for _, g := range slot.StartTimes {
+					for _, tm := range g.Times {
+						if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
+							rr := resolvedFromSlot(slot)
+							if g.Trips != nil {
+								rr.Trips = g.Trips
+							}
+							if g.TripDuration != nil {
+								rr.TripDuration = g.TripDuration
+							}
+							if g.BreakDuration != nil {
+								rr.BreakDuration = g.BreakDuration
+							}
+							if g.FirstAdvance != nil {
+								rr.FirstAdvance = g.FirstAdvance
+							}
+							if g.LastRemains != nil {
+								rr.LastRemains = g.LastRemains
+							}
+							return &rr
 						}
-						if g.TripDuration != nil {
-							rr.TripDuration = g.TripDuration
-						}
-						if g.BreakDuration != nil {
-							rr.BreakDuration = g.BreakDuration
-						}
-						if g.FirstAdvance != nil {
-							rr.FirstAdvance = g.FirstAdvance
-						}
-						if g.LastRemains != nil {
-							rr.LastRemains = g.LastRemains
-						}
-						return &rr
 					}
 				}
 			}
+			rr := resolvedFromSlot(slot)
+			return &rr
 		}
-		rr := resolvedFromEntry(entry)
-		return &rr
 	}
 	return nil
 }

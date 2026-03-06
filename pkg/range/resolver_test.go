@@ -7,16 +7,28 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
-func TestFindDateRange_GroupOverride(t *testing.T) {
+// testSeasons returns a map with a single season "s" covering [from, to].
+func testSeasons(from, to time.Time) map[string]model.Season {
+	return map[string]model.Season{"s": {{From: from, To: to}}}
+}
+
+// testSched builds a Schedule referencing season "s" with the provided slots.
+func testSched(slots ...model.Slot) model.Schedule {
+	return model.Schedule{Seasons: []string{"s"}, Slots: slots}
+}
+
+func TestFindSchedule_GroupOverride(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	trips := 3
 	tripDur := 40
 	grp := model.StartTimeGroup{Times: []string{"10:00"}, Trips: &trips, TripDuration: &tripDur}
-	dr := model.DateRange{From: from, To: to, StartTimes: []model.StartTimeGroup{grp}}
+	slot := model.Slot{StartTimes: []model.StartTimeGroup{grp}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
 	appt := time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00", appt.Weekday())
+	rr := FindSchedule([]model.Schedule{sched}, appt, "10:00", appt.Weekday(), seasons)
 	if rr == nil {
 		t.Fatalf("expected resolved range")
 	}
@@ -28,134 +40,191 @@ func TestFindDateRange_GroupOverride(t *testing.T) {
 	}
 }
 
-func TestFindDateRange_NoMatch(t *testing.T) {
+func TestFindSchedule_NoMatch(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to}
+	sched := testSched(model.Slot{})
+	seasons := testSeasons(from, to)
 	appt := time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00", appt.Weekday())
+	rr := FindSchedule([]model.Schedule{sched}, appt, "10:00", appt.Weekday(), seasons)
 	if rr != nil {
 		t.Fatalf("expected nil for out-of-range date")
 	}
 }
 
-func TestFindDateRange_BoundaryFirstDay(t *testing.T) {
+func TestFindSchedule_BoundaryFirstDay(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to}
-	if FindDateRange([]model.DateRange{dr}, from, "", from.Weekday()) == nil {
+	sched := testSched(model.Slot{})
+	seasons := testSeasons(from, to)
+	if FindSchedule([]model.Schedule{sched}, from, "", from.Weekday(), seasons) == nil {
 		t.Fatalf("expected match on first day")
 	}
 }
 
-func TestFindDateRange_BoundaryLastDay(t *testing.T) {
+func TestFindSchedule_BoundaryLastDay(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to}
-	if FindDateRange([]model.DateRange{dr}, to, "", to.Weekday()) == nil {
+	sched := testSched(model.Slot{})
+	seasons := testSeasons(from, to)
+	if FindSchedule([]model.Schedule{sched}, to, "", to.Weekday(), seasons) == nil {
 		t.Fatalf("expected match on last day")
 	}
 }
 
-func TestFindDateRange_EmptyList(t *testing.T) {
-	if FindDateRange([]model.DateRange{}, time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), "", time.Monday) != nil {
-		t.Fatalf("expected nil for empty list")
+func TestFindSchedule_EmptyList(t *testing.T) {
+	if FindSchedule([]model.Schedule{}, time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), "", time.Monday, nil) != nil {
+		t.Fatalf("expected nil for empty schedule list")
 	}
 }
 
-func TestFindDateRange_StartTimeMismatchReturnsEntry(t *testing.T) {
+func TestFindSchedule_StartTimeMismatchReturnsEntry(t *testing.T) {
 	adv := 30
 	groupTrips := 3
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	grp := model.StartTimeGroup{Times: []string{"14:40"}, Trips: &groupTrips}
-	dr := model.DateRange{From: from, To: to, FirstAdvance: &adv, StartTimes: []model.StartTimeGroup{grp}}
+	slot := model.Slot{FirstAdvance: &adv, StartTimes: []model.StartTimeGroup{grp}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
-	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday)
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
 	if rr == nil {
-		t.Fatalf("expected entry-level result on startTime mismatch")
+		t.Fatalf("expected slot-level result on startTime mismatch")
 	}
 	if rr.Trips != nil {
 		t.Fatalf("expected Trips=nil (no group match) got %v", *rr.Trips)
 	}
 }
 
-func TestFindDateRange_GroupFieldOverridesEntry(t *testing.T) {
-	entryTrips := 2
+func TestFindSchedule_GroupFieldOverridesSlot(t *testing.T) {
+	slotTrips := 2
 	groupTrips := 5
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	grp := model.StartTimeGroup{Times: []string{"09:00"}, Trips: &groupTrips}
-	dr := model.DateRange{From: from, To: to, Trips: &entryTrips, StartTimes: []model.StartTimeGroup{grp}}
+	slot := model.Slot{Trips: &slotTrips, StartTimes: []model.StartTimeGroup{grp}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
-	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "09:00", time.Friday)
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "09:00", time.Friday, seasons)
 	if rr == nil || rr.Trips == nil || *rr.Trips != 5 {
-		t.Fatalf("expected group trips=5 to override entry trips=2")
+		t.Fatalf("expected group trips=5 to override slot trips=2")
 	}
 }
 
-func TestFindDateRange_WeekdayMatch(t *testing.T) {
+func TestFindSchedule_WeekdayMatch(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to, Weekdays: []string{"Tue", "Fri"}}
+	slot := model.Slot{Weekdays: []string{"Tue", "Fri"}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
 	// 2026-04-07 is a Tuesday
 	tue := time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, tue, "", tue.Weekday()); rr == nil {
+	if rr := FindSchedule([]model.Schedule{sched}, tue, "", tue.Weekday(), seasons); rr == nil {
 		t.Fatalf("expected match on Tuesday")
 	}
 
 	// 2026-04-10 is a Friday
 	fri := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, fri, "", fri.Weekday()); rr == nil {
+	if rr := FindSchedule([]model.Schedule{sched}, fri, "", fri.Weekday(), seasons); rr == nil {
 		t.Fatalf("expected match on Friday")
 	}
 }
 
-func TestFindDateRange_WeekdayNoMatch(t *testing.T) {
+func TestFindSchedule_WeekdayNoMatch(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to, Weekdays: []string{"Tue", "Fri"}}
+	slot := model.Slot{Weekdays: []string{"Tue", "Fri"}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
 	// 2026-04-08 is a Wednesday
 	wed := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, wed, "", wed.Weekday()); rr != nil {
+	if rr := FindSchedule([]model.Schedule{sched}, wed, "", wed.Weekday(), seasons); rr != nil {
 		t.Fatalf("expected nil for Wednesday when weekdays=[Tue,Fri]")
 	}
 }
 
-func TestFindDateRange_EmptyWeekdaysMatchesAll(t *testing.T) {
+func TestFindSchedule_EmptyWeekdaysMatchesAll(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
-	dr := model.DateRange{From: from, To: to} // no weekdays
+	slot := model.Slot{} // no weekdays filter
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
 	for _, d := range []time.Time{
 		time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC),  // Mon
 		time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC),  // Tue
 		time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC), // Sat
 	} {
-		if rr := FindDateRange([]model.DateRange{dr}, d, "", d.Weekday()); rr == nil {
+		if rr := FindSchedule([]model.Schedule{sched}, d, "", d.Weekday(), seasons); rr == nil {
 			t.Fatalf("expected match for %s with empty weekdays list", d.Weekday())
 		}
 	}
 }
 
-func TestFindDateRange_WeekdayFallThroughToSecondRange(t *testing.T) {
+func TestFindSchedule_WeekdayFallThroughToSecondSchedule(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
 	trips := 9
-	// first range: Tue/Fri only; second range: all days, has trips override
-	dr1 := model.DateRange{From: from, To: to, Weekdays: []string{"Tue", "Fri"}}
-	dr2 := model.DateRange{From: from, To: to, Trips: &trips}
+	// first schedule: Tue/Fri only; second schedule: all days, has trips override
+	sched1 := testSched(model.Slot{Weekdays: []string{"Tue", "Fri"}})
+	sched2 := testSched(model.Slot{Trips: &trips})
+	seasons := testSeasons(from, to)
 
-	// Wednesday: should skip dr1 (weekday mismatch) and match dr2
+	// Wednesday: should skip sched1 (no slot matches weekday) and match sched2
 	wed := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr1, dr2}, wed, "", wed.Weekday())
+	rr := FindSchedule([]model.Schedule{sched1, sched2}, wed, "", wed.Weekday(), seasons)
 	if rr == nil {
-		t.Fatalf("expected match from second range on Wednesday")
+		t.Fatalf("expected match from second schedule on Wednesday")
 	}
 	if rr.Trips == nil || *rr.Trips != 9 {
-		t.Fatalf("expected trips=9 from second range, got %+v", rr.Trips)
+		t.Fatalf("expected trips=9 from second schedule, got %+v", rr.Trips)
+	}
+}
+
+func TestFindSchedule_MultiWindowSeason(t *testing.T) {
+	// Season with two non-overlapping windows: Apr 1–17 and Sep 1–Oct 31
+	seasons := map[string]model.Season{
+		"s": {
+			{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)},
+			{From: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)},
+		},
+	}
+	sched := model.Schedule{Seasons: []string{"s"}, Slots: []model.Slot{{}}}
+	inApril := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
+	inSep := time.Date(2026, 9, 15, 0, 0, 0, 0, time.UTC)
+	inSummer := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
+
+	if FindSchedule([]model.Schedule{sched}, inApril, "", inApril.Weekday(), seasons) == nil {
+		t.Fatalf("expected match for date in first window")
+	}
+	if FindSchedule([]model.Schedule{sched}, inSep, "", inSep.Weekday(), seasons) == nil {
+		t.Fatalf("expected match for date in second window")
+	}
+	if FindSchedule([]model.Schedule{sched}, inSummer, "", inSummer.Weekday(), seasons) != nil {
+		t.Fatalf("expected nil for date between the two windows")
+	}
+}
+
+func TestFindSchedule_MultiSeason(t *testing.T) {
+	// Schedule referencing two different seasons
+	seasons := map[string]model.Season{
+		"spring": {{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 6, 28, 0, 0, 0, 0, time.UTC)}},
+		"autumn": {{From: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)}},
+	}
+	sched := model.Schedule{Seasons: []string{"spring", "autumn"}, Slots: []model.Slot{{}}}
+
+	if FindSchedule([]model.Schedule{sched}, time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), "", time.Friday, seasons) == nil {
+		t.Fatalf("expected match for spring date")
+	}
+	if FindSchedule([]model.Schedule{sched}, time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), "", time.Thursday, seasons) == nil {
+		t.Fatalf("expected match for autumn date")
+	}
+	if FindSchedule([]model.Schedule{sched}, time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC), "", time.Wednesday, seasons) != nil {
+		t.Fatalf("expected nil for summer date not in either season")
 	}
 }
 
@@ -193,21 +262,23 @@ func TestEffectiveWeekday_UnknownAbbr(t *testing.T) {
 	}
 }
 
-func TestFindDateRange_ExceptionRemapsWeekday(t *testing.T) {
+func TestFindSchedule_ExceptionRemapsWeekday(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
-	// Range only matches on Sat/Sun
-	dr := model.DateRange{From: from, To: to, Weekdays: []string{"Sat", "Sun"}}
+	// Slot only matches on Sat/Sun
+	slot := model.Slot{Weekdays: []string{"Sat", "Sun"}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
 
-	// 2026-04-06 is a Monday — naturally would not match Sat/Sun range.
+	// 2026-04-06 is a Monday — naturally would not match Sat/Sun slot.
 	exceptionDate := time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
 
 	// Without exception: no match
-	if rr := FindDateRange([]model.DateRange{dr}, exceptionDate, "", exceptionDate.Weekday()); rr != nil {
+	if rr := FindSchedule([]model.Schedule{sched}, exceptionDate, "", exceptionDate.Weekday(), seasons); rr != nil {
 		t.Fatalf("expected nil without exception remap, got match")
 	}
 	// With exception remapping to Sunday: should match
-	if rr := FindDateRange([]model.DateRange{dr}, exceptionDate, "", time.Sunday); rr == nil {
+	if rr := FindSchedule([]model.Schedule{sched}, exceptionDate, "", time.Sunday, seasons); rr == nil {
 		t.Fatalf("expected match when effectiveWeekday=Sunday")
 	}
 }

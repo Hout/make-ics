@@ -49,14 +49,30 @@ func LoadConfigFromBytes(data []byte) (model.Config, error) {
 	return cfg, nil
 }
 
-// ValidateConfig checks that the required fields are present and that the
-// timezone is a valid IANA location name.
+// ValidateConfig checks that the required fields are present, that the timezone
+// is a valid IANA location name, and that every Schedule.Seasons name references
+// a key defined in cfg.Seasons.
 func ValidateConfig(cfg model.Config, path string) error {
 	if cfg.Timezone == "" || cfg.Locale == "" || len(cfg.ShiftType) == 0 {
 		return fmt.Errorf("config file %q is missing required keys: timezone, locale, or shift_type", path)
 	}
 	if _, err := time.LoadLocation(cfg.Timezone); err != nil {
 		return fmt.Errorf("config file %q has invalid timezone: %q", path, cfg.Timezone)
+	}
+	for code, st := range cfg.ShiftType {
+		for si, sched := range st.Schedules {
+			if len(sched.Seasons) == 0 {
+				return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] has no seasons", path, code, si)
+			}
+			if len(sched.Slots) == 0 {
+				return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] has no slots", path, code, si)
+			}
+			for _, name := range sched.Seasons {
+				if _, ok := cfg.Seasons[name]; !ok {
+					return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] references unknown season %q", path, code, si, name)
+				}
+			}
+		}
 	}
 	return nil
 }

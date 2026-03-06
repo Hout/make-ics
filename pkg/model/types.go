@@ -2,8 +2,8 @@ package model
 
 import "time"
 
-// StartTimeGroup is an optional override within a DateRange that narrows
-// scheduling parameters to specific departure times.
+// StartTimeGroup is an optional override within a Slot that narrows scheduling
+// parameters to specific departure times.
 type StartTimeGroup struct {
 	Times         []string `yaml:"times,omitempty"`
 	Trips         *int     `yaml:"trips,omitempty"`
@@ -13,30 +13,42 @@ type StartTimeGroup struct {
 	LastRemains   *int     `yaml:"last_shift_remains,omitempty"`
 }
 
-// DateRange defines a calendar window [From, To] with optional per-window
-// overrides for trips, durations, advance, and last-shift extension.
+// DateRange is a date window [From, To] inclusive.
 type DateRange struct {
-	From          time.Time        `yaml:"from"`
-	To            time.Time        `yaml:"to"`
+	From time.Time `yaml:"from"`
+	To   time.Time `yaml:"to"`
+}
+
+// Season is a named collection of one or more DateRange windows.
+type Season []DateRange
+
+// Slot defines the scheduling parameters for a specific weekday set within a Schedule.
+type Slot struct {
 	Weekdays      []string         `yaml:"weekdays,omitempty"`
-	FirstAdvance  *int             `yaml:"first_shift_advance,omitempty"`
-	StartTimes    []StartTimeGroup `yaml:"start_times,omitempty"`
 	Trips         *int             `yaml:"trips,omitempty"`
 	TripDuration  *int             `yaml:"trip_duration,omitempty"`
 	BreakDuration *int             `yaml:"break_duration,omitempty"`
+	FirstAdvance  *int             `yaml:"first_shift_advance,omitempty"`
 	LastRemains   *int             `yaml:"last_shift_remains,omitempty"`
+	StartTimes    []StartTimeGroup `yaml:"start_times,omitempty"`
+}
+
+// Schedule associates one or more named seasons with a set of weekday Slots.
+type Schedule struct {
+	Seasons []string `yaml:"seasons"`
+	Slots   []Slot   `yaml:"slots,omitempty"`
 }
 
 // ShiftType holds the scheduling parameters for a named shift code.
 type ShiftType struct {
-	Summary       string      `yaml:"summary,omitempty"`
-	Description   string      `yaml:"description,omitempty"`
-	Trips         *int        `yaml:"trips,omitempty"`
-	TripDuration  *int        `yaml:"trip_duration,omitempty"`
-	BreakDuration *int        `yaml:"break_duration,omitempty"`
-	FirstShiftAdv *int        `yaml:"first_shift_advance,omitempty"`
-	LastShiftRem  *int        `yaml:"last_shift_remains,omitempty"`
-	DateRanges    []DateRange `yaml:"date_ranges,omitempty"`
+	Summary       string     `yaml:"summary,omitempty"`
+	Description   string     `yaml:"description,omitempty"`
+	Trips         *int       `yaml:"trips,omitempty"`
+	TripDuration  *int       `yaml:"trip_duration,omitempty"`
+	BreakDuration *int       `yaml:"break_duration,omitempty"`
+	FirstShiftAdv *int       `yaml:"first_shift_advance,omitempty"`
+	LastShiftRem  *int       `yaml:"last_shift_remains,omitempty"`
+	Schedules     []Schedule `yaml:"schedules,omitempty"`
 }
 
 // Exception remaps a specific calendar date to a different weekday for schedule
@@ -51,5 +63,6 @@ type Config struct {
 	Timezone   string               `yaml:"timezone"`
 	Locale     string               `yaml:"locale"`
 	Exceptions map[string]Exception `yaml:"exceptions,omitempty"`
+	Seasons    map[string]Season    `yaml:"seasons,omitempty"`
 	ShiftType  map[string]ShiftType `yaml:"shift_type"`
 }

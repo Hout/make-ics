@@ -14,43 +14,46 @@ func date(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-// minimalConfig builds a Config with two shift types and two distinct windows.
+// minimalConfig builds a Config with two shift types and two distinct seasons.
 func minimalConfig() model.Config {
 	return model.Config{
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
+		Seasons: map[string]model.Season{
+			"spring": {{From: date(2026, time.April, 1), To: date(2026, time.June, 30)}},
+			"summer": {{From: date(2026, time.July, 1), To: date(2026, time.August, 31)}},
+		},
 		ShiftType: map[string]model.ShiftType{
 			"AAA_": {
 				Summary: "Binnendieze AAA",
 				Trips:   intPtr(2),
-				DateRanges: []model.DateRange{
+				Schedules: []model.Schedule{
 					{
-						From: date(2026, time.April, 1),
-						To:   date(2026, time.June, 30),
-						StartTimes: []model.StartTimeGroup{
-							{Times: []string{"10:00", "14:00"}},
+						Seasons: []string{"spring"},
+						Slots: []model.Slot{
+							{StartTimes: []model.StartTimeGroup{{Times: []string{"10:00", "14:00"}}}},
 						},
 					},
 					{
-						From: date(2026, time.July, 1),
-						To:   date(2026, time.August, 31),
-						StartTimes: []model.StartTimeGroup{
-							{Times: []string{"09:00", "13:00", "17:00"}},
+						Seasons: []string{"summer"},
+						Slots: []model.Slot{
+							{StartTimes: []model.StartTimeGroup{{Times: []string{"09:00", "13:00", "17:00"}}}},
 						},
 					},
 				},
 			},
-			// BBB_ uses the same Apr–Jun window as AAA_, Sat/Sun only.
+			// BBB_ uses the spring season, Sat/Sun only.
 			"BBB_": {
 				Summary: "Binnendieze BBB",
 				Trips:   intPtr(1),
-				DateRanges: []model.DateRange{
+				Schedules: []model.Schedule{
 					{
-						From:     date(2026, time.April, 1),
-						To:       date(2026, time.June, 30),
-						Weekdays: []string{"Sat", "Sun"},
-						StartTimes: []model.StartTimeGroup{
-							{Times: []string{"11:00"}},
+						Seasons: []string{"spring"},
+						Slots: []model.Slot{
+							{
+								Weekdays:   []string{"Sat", "Sun"},
+								StartTimes: []model.StartTimeGroup{{Times: []string{"11:00"}}},
+							},
 						},
 					},
 				},
@@ -136,37 +139,37 @@ func TestRenderShiftTable_SortedTimes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// In the Jul–Aug window AAA_ lists three times; 09:00 should appear
+	// In the summer season AAA_ lists three times; 09:00 should appear
 	if !strings.Contains(out, "09:00") {
 		t.Errorf("expected time 09:00 in output")
 	}
 }
 
 func TestRenderShiftTable_NoDuplicateHeadings(t *testing.T) {
-	// BBB_ has two DateRanges for the same dates, split by weekday — a common
-	// config pattern that previously produced two identical ### headings.
+	// BBB_ uses one Schedule with two Slots split by weekday — should produce
+	// a single ### heading with both weekday rows merged.
 	cfg := model.Config{
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
+		Seasons: map[string]model.Season{
+			"spring": {{From: date(2026, time.April, 1), To: date(2026, time.June, 30)}},
+		},
 		ShiftType: map[string]model.ShiftType{
 			"BBB_": {
 				Summary: "Binnendieze BBB",
 				Trips:   intPtr(1),
-				DateRanges: []model.DateRange{
+				Schedules: []model.Schedule{
 					{
-						From:     date(2026, time.April, 1),
-						To:       date(2026, time.June, 30),
-						Weekdays: []string{"Tue", "Wed", "Thu", "Fri"},
-						StartTimes: []model.StartTimeGroup{
-							{Times: []string{"13:00", "15:00"}},
-						},
-					},
-					{
-						From:     date(2026, time.April, 1),
-						To:       date(2026, time.June, 30),
-						Weekdays: []string{"Sat", "Sun"},
-						StartTimes: []model.StartTimeGroup{
-							{Times: []string{"11:00"}},
+						Seasons: []string{"spring"},
+						Slots: []model.Slot{
+							{
+								Weekdays:   []string{"Tue", "Wed", "Thu", "Fri"},
+								StartTimes: []model.StartTimeGroup{{Times: []string{"13:00", "15:00"}}},
+							},
+							{
+								Weekdays:   []string{"Sat", "Sun"},
+								StartTimes: []model.StartTimeGroup{{Times: []string{"11:00"}}},
+							},
 						},
 					},
 				},
@@ -185,7 +188,7 @@ func TestRenderShiftTable_NoDuplicateHeadings(t *testing.T) {
 		t.Errorf("expected exactly 1 occurrence of ### Binnendieze BBB, got %d\noutput:\n%s", count, out)
 	}
 
-	// Times from both weekday sub-ranges must be present.
+	// Times from both weekday slots must be present.
 	lines := strings.Split(out, "\n")
 	var tueLine, satLine string
 	for _, l := range lines {
@@ -208,12 +211,12 @@ func TestRenderShiftTable_NoDuplicateHeadings(t *testing.T) {
 }
 
 func TestTimesForWeekday_NoFilter(t *testing.T) {
-	dr := model.DateRange{
+	slot := model.Slot{
 		StartTimes: []model.StartTimeGroup{
 			{Times: []string{"14:00", "10:00"}},
 		},
 	}
-	got := timesForWeekday(dr, time.Monday)
+	got := timesForWeekday(slot, time.Monday)
 	want := "10:00, 14:00"
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
@@ -221,24 +224,24 @@ func TestTimesForWeekday_NoFilter(t *testing.T) {
 }
 
 func TestTimesForWeekday_FilterExcludes(t *testing.T) {
-	dr := model.DateRange{
+	slot := model.Slot{
 		Weekdays: []string{"Sat", "Sun"},
 		StartTimes: []model.StartTimeGroup{
 			{Times: []string{"11:00"}},
 		},
 	}
-	if got := timesForWeekday(dr, time.Monday); got != "–" {
+	if got := timesForWeekday(slot, time.Monday); got != "–" {
 		t.Errorf("expected – for excluded weekday, got %q", got)
 	}
-	if got := timesForWeekday(dr, time.Saturday); got == "–" {
+	if got := timesForWeekday(slot, time.Saturday); got == "–" {
 		t.Errorf("expected time for Saturday, got –")
 	}
 }
 
 func TestTimesForWeekday_Empty(t *testing.T) {
-	dr := model.DateRange{}
-	if got := timesForWeekday(dr, time.Monday); got != "–" {
-		t.Errorf("expected – for empty date range, got %q", got)
+	slot := model.Slot{}
+	if got := timesForWeekday(slot, time.Monday); got != "–" {
+		t.Errorf("expected – for empty slot, got %q", got)
 	}
 }
 
@@ -317,18 +320,24 @@ func TestRenderMermaidCharts_Structure(t *testing.T) {
 	cfg := model.Config{
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
+		Seasons: map[string]model.Season{
+			"spring": {{From: date(2026, time.April, 1), To: date(2026, time.June, 30)}},
+		},
 		ShiftType: map[string]model.ShiftType{
 			"VRK_": {
 				Summary:       "VRK",
 				Trips:         intPtr(2),
 				TripDuration:  intPtr(75),
 				BreakDuration: intPtr(30),
-				DateRanges: []model.DateRange{
+				Schedules: []model.Schedule{
 					{
-						From:       date(2026, time.April, 1),
-						To:         date(2026, time.June, 30),
-						Weekdays:   []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
-						StartTimes: []model.StartTimeGroup{{Times: []string{"10:15", "13:45"}}},
+						Seasons: []string{"spring"},
+						Slots: []model.Slot{
+							{
+								Weekdays:   []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+								StartTimes: []model.StartTimeGroup{{Times: []string{"10:15", "13:45"}}},
+							},
+						},
 					},
 				},
 			},
@@ -366,9 +375,10 @@ func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
 			name: "trips from ShiftType",
 			group: []windowEntry{{
 				code: "AAA_",
-				dr: model.DateRange{
-					StartTimes: []model.StartTimeGroup{
-						{Times: []string{"14:00", "10:00"}},
+				sched: model.Schedule{
+					Seasons: []string{"s"},
+					Slots: []model.Slot{
+						{StartTimes: []model.StartTimeGroup{{Times: []string{"14:00", "10:00"}}}},
 					},
 				},
 				shiftType: model.ShiftType{Trips: intPtr(2)},
@@ -377,13 +387,13 @@ func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
 			want: "10:00(2), 14:00(2)",
 		},
 		{
-			name: "trips from DateRange overrides ShiftType",
+			name: "trips from Slot overrides ShiftType",
 			group: []windowEntry{{
 				code: "AAA_",
-				dr: model.DateRange{
-					Trips: intPtr(3),
-					StartTimes: []model.StartTimeGroup{
-						{Times: []string{"10:00"}},
+				sched: model.Schedule{
+					Seasons: []string{"s"},
+					Slots: []model.Slot{
+						{Trips: intPtr(3), StartTimes: []model.StartTimeGroup{{Times: []string{"10:00"}}}},
 					},
 				},
 				shiftType: model.ShiftType{Trips: intPtr(1)},
@@ -392,13 +402,13 @@ func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
 			want: "10:00(3)",
 		},
 		{
-			name: "trips from StartTimeGroup overrides DateRange and ShiftType",
+			name: "trips from StartTimeGroup overrides Slot and ShiftType",
 			group: []windowEntry{{
 				code: "AAA_",
-				dr: model.DateRange{
-					Trips: intPtr(2),
-					StartTimes: []model.StartTimeGroup{
-						{Times: []string{"10:00"}, Trips: intPtr(5)},
+				sched: model.Schedule{
+					Seasons: []string{"s"},
+					Slots: []model.Slot{
+						{Trips: intPtr(2), StartTimes: []model.StartTimeGroup{{Times: []string{"10:00"}, Trips: intPtr(5)}}},
 					},
 				},
 				shiftType: model.ShiftType{Trips: intPtr(1)},
@@ -410,9 +420,10 @@ func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
 			name: "trips nil at all levels returns error",
 			group: []windowEntry{{
 				code: "AAA_",
-				dr: model.DateRange{
-					StartTimes: []model.StartTimeGroup{
-						{Times: []string{"10:00"}},
+				sched: model.Schedule{
+					Seasons: []string{"s"},
+					Slots: []model.Slot{
+						{StartTimes: []model.StartTimeGroup{{Times: []string{"10:00"}}}},
 					},
 				},
 				shiftType: model.ShiftType{},
@@ -424,10 +435,13 @@ func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
 			name: "weekday excluded returns dash",
 			group: []windowEntry{{
 				code: "AAA_",
-				dr: model.DateRange{
-					Weekdays: []string{"Sat"},
-					StartTimes: []model.StartTimeGroup{
-						{Times: []string{"10:00"}},
+				sched: model.Schedule{
+					Seasons: []string{"s"},
+					Slots: []model.Slot{
+						{
+							Weekdays:   []string{"Sat"},
+							StartTimes: []model.StartTimeGroup{{Times: []string{"10:00"}}},
+						},
 					},
 				},
 				shiftType: model.ShiftType{Trips: intPtr(2)},

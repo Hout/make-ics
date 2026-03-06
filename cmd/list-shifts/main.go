@@ -46,14 +46,25 @@ func main() {
 	}
 }
 
-// windowEntry holds one shift type's DateRange together with its parent ShiftType
+// windowEntry holds one shift type's Schedule together with its parent ShiftType
 // so that helpers can resolve the three-level override chain (StartTimeGroup →
-// DateRange → ShiftType) without an additional map lookup.
+// Slot → ShiftType) without an additional map lookup.
 type windowEntry struct {
 	code      string
 	summary   string
-	dr        model.DateRange
+	sched     model.Schedule
 	shiftType model.ShiftType
+}
+
+// resolvedWindows returns all DateRange windows for all seasons referenced by
+// sched. Unknown season names produce an empty contribution (validation catches
+// them earlier).
+func resolvedWindows(sched model.Schedule, seasons map[string]model.Season) []model.DateRange {
+	var windows []model.DateRange
+	for _, name := range sched.Seasons {
+		windows = append(windows, seasons[name]...)
+	}
+	return windows
 }
 
 // Run is the testable entry point.
@@ -96,10 +107,12 @@ func renderShiftTable(cfg model.Config) (string, error) {
 	boundarySet := map[time.Time]struct{}{}
 
 	for code, st := range cfg.ShiftType {
-		for _, dr := range st.DateRanges {
-			all = append(all, windowEntry{code: code, summary: st.Summary, dr: dr, shiftType: st})
-			boundarySet[dr.From] = struct{}{}
-			boundarySet[dr.To.AddDate(0, 0, 1)] = struct{}{}
+		for _, sched := range st.Schedules {
+			all = append(all, windowEntry{code: code, summary: st.Summary, sched: sched, shiftType: st})
+			for _, win := range resolvedWindows(sched, cfg.Seasons) {
+				boundarySet[win.From] = struct{}{}
+				boundarySet[win.To.AddDate(0, 0, 1)] = struct{}{}
+			}
 		}
 	}
 
@@ -116,11 +129,14 @@ func renderShiftTable(cfg model.Config) (string, error) {
 		start := boundaries[i]
 		end := boundaries[i+1].AddDate(0, 0, -1)
 
-		// Collect entries whose date range overlaps [start, end].
+		// Collect entries whose season windows overlap [start, end].
 		var entries []windowEntry
 		for _, e := range all {
-			if !e.dr.From.After(end) && !e.dr.To.Before(start) {
-				entries = append(entries, e)
+			for _, win := range resolvedWindows(e.sched, cfg.Seasons) {
+				if !win.From.After(end) && !win.To.Before(start) {
+					entries = append(entries, e)
+					break
+				}
 			}
 		}
 		if len(entries) == 0 {
@@ -181,10 +197,12 @@ func renderMermaidCharts(cfg model.Config) string {
 	var all []windowEntry
 	boundarySet := map[time.Time]struct{}{}
 	for code, st := range cfg.ShiftType {
-		for _, dr := range st.DateRanges {
-			all = append(all, windowEntry{code: code, summary: st.Summary, dr: dr, shiftType: st})
-			boundarySet[dr.From] = struct{}{}
-			boundarySet[dr.To.AddDate(0, 0, 1)] = struct{}{}
+		for _, sched := range st.Schedules {
+			all = append(all, windowEntry{code: code, summary: st.Summary, sched: sched, shiftType: st})
+			for _, win := range resolvedWindows(sched, cfg.Seasons) {
+				boundarySet[win.From] = struct{}{}
+				boundarySet[win.To.AddDate(0, 0, 1)] = struct{}{}
+			}
 		}
 	}
 	boundaries := make([]time.Time, 0, len(boundarySet))
@@ -201,8 +219,11 @@ func renderMermaidCharts(cfg model.Config) string {
 
 		var entries []windowEntry
 		for _, e := range all {
-			if !e.dr.From.After(wEnd) && !e.dr.To.Before(wStart) {
-				entries = append(entries, e)
+			for _, win := range resolvedWindows(e.sched, cfg.Seasons) {
+				if !win.From.After(wEnd) && !win.To.Before(wStart) {
+					entries = append(entries, e)
+					break
+				}
 			}
 		}
 		if len(entries) == 0 {
@@ -288,53 +309,55 @@ type depBar struct {
 
 // resolveDeparturesForWeekday returns one depBar per unique departure start time
 // for wd across all entries in group, using the three-level override chain
-// (StartTimeGroup → DateRange → ShiftType). The bar spans the full working time
+// (StartTimeGroup → Slot → ShiftType). The bar spans the full working time
 // from the first trip start to the last trip end (breaks included).
 // Entries without a resolved tripDuration are silently skipped.
 func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar {
 	seen := map[string]depBar{}
 	for _, e := range group {
-		if !weekdayAllowed(e.dr, wd) {
-			continue
-		}
-		for _, g := range e.dr.StartTimes {
-			var trips *int
-			if g.Trips != nil {
-				trips = g.Trips
-			} else if e.dr.Trips != nil {
-				trips = e.dr.Trips
-			} else {
-				trips = e.shiftType.Trips
-			}
-			var tripDuration *int
-			if g.TripDuration != nil {
-				tripDuration = g.TripDuration
-			} else if e.dr.TripDuration != nil {
-				tripDuration = e.dr.TripDuration
-			} else {
-				tripDuration = e.shiftType.TripDuration
-			}
-			if trips == nil || tripDuration == nil {
+		for _, slot := range e.sched.Slots {
+			if !weekdayAllowed(slot, wd) {
 				continue
 			}
-			var breakDuration *int
-			if g.BreakDuration != nil {
-				breakDuration = g.BreakDuration
-			} else if e.dr.BreakDuration != nil {
-				breakDuration = e.dr.BreakDuration
-			} else {
-				breakDuration = e.shiftType.BreakDuration
-			}
-			bd := 0
-			if breakDuration != nil {
-				bd = *breakDuration
-			}
-			n := *trips
-			td := *tripDuration
-			total := n*td + max(0, n-1)*bd
-			for _, ts := range g.Times {
-				if _, exists := seen[ts]; !exists {
-					seen[ts] = depBar{start: ts, totalDuration: total}
+			for _, g := range slot.StartTimes {
+				var trips *int
+				if g.Trips != nil {
+					trips = g.Trips
+				} else if slot.Trips != nil {
+					trips = slot.Trips
+				} else {
+					trips = e.shiftType.Trips
+				}
+				var tripDuration *int
+				if g.TripDuration != nil {
+					tripDuration = g.TripDuration
+				} else if slot.TripDuration != nil {
+					tripDuration = slot.TripDuration
+				} else {
+					tripDuration = e.shiftType.TripDuration
+				}
+				if trips == nil || tripDuration == nil {
+					continue
+				}
+				var breakDuration *int
+				if g.BreakDuration != nil {
+					breakDuration = g.BreakDuration
+				} else if slot.BreakDuration != nil {
+					breakDuration = slot.BreakDuration
+				} else {
+					breakDuration = e.shiftType.BreakDuration
+				}
+				bd := 0
+				if breakDuration != nil {
+					bd = *breakDuration
+				}
+				n := *trips
+				td := *tripDuration
+				total := n*td + max(0, n-1)*bd
+				for _, ts := range g.Times {
+					if _, exists := seen[ts]; !exists {
+						seen[ts] = depBar{start: ts, totalDuration: total}
+					}
 				}
 			}
 		}
@@ -351,33 +374,35 @@ func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar 
 // the given weekday, returning a sorted, deduplicated, comma-joined string with
 // trip count annotations (e.g. "10:00(2), 14:00(2)"), or "\u2013" if no entry
 // contributes any times. Trips are resolved via the three-level override chain
-// (StartTimeGroup \u2192 DateRange \u2192 ShiftType); an error is returned if trips
+// (StartTimeGroup \u2192 Slot \u2192 ShiftType); an error is returned if trips
 // cannot be resolved for any start time.
 func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) (string, error) {
 	seen := map[string]string{} // bare time → formatted "HH:MM(N)"
 	var keys []string
 	for _, e := range group {
-		if !weekdayAllowed(e.dr, wd) {
-			continue
-		}
-		for _, g := range e.dr.StartTimes {
-			var trips *int
-			if g.Trips != nil {
-				trips = g.Trips
-			} else if e.dr.Trips != nil {
-				trips = e.dr.Trips
-			} else {
-				trips = e.shiftType.Trips
+		for _, slot := range e.sched.Slots {
+			if !weekdayAllowed(slot, wd) {
+				continue
 			}
-			for _, ts := range g.Times {
-				if _, exists := seen[ts]; exists {
-					continue
+			for _, g := range slot.StartTimes {
+				var trips *int
+				if g.Trips != nil {
+					trips = g.Trips
+				} else if slot.Trips != nil {
+					trips = slot.Trips
+				} else {
+					trips = e.shiftType.Trips
 				}
-				if trips == nil {
-					return "", fmt.Errorf("shift %q: no trips configured for start time %q", e.code, ts)
+				for _, ts := range g.Times {
+					if _, exists := seen[ts]; exists {
+						continue
+					}
+					if trips == nil {
+						return "", fmt.Errorf("shift %q: no trips configured for start time %q", e.code, ts)
+					}
+					seen[ts] = fmt.Sprintf("%s(%d)", ts, *trips)
+					keys = append(keys, ts)
 				}
-				seen[ts] = fmt.Sprintf("%s(%d)", ts, *trips)
-				keys = append(keys, ts)
 			}
 		}
 	}
@@ -392,14 +417,14 @@ func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) (string, error)
 	return strings.Join(formatted, ", "), nil
 }
 
-// timesForWeekday returns the sorted, comma-joined start times for wd in dr,
+// timesForWeekday returns the sorted, comma-joined start times for wd in slot,
 // or "\u2013" when the weekday is excluded by the weekdays filter or no times are defined.
-func timesForWeekday(dr model.DateRange, wd time.Weekday) string {
-	if !weekdayAllowed(dr, wd) {
+func timesForWeekday(slot model.Slot, wd time.Weekday) string {
+	if !weekdayAllowed(slot, wd) {
 		return "\u2013"
 	}
 	var times []string
-	for _, g := range dr.StartTimes {
+	for _, g := range slot.StartTimes {
 		times = append(times, g.Times...)
 	}
 	if len(times) == 0 {
@@ -409,14 +434,14 @@ func timesForWeekday(dr model.DateRange, wd time.Weekday) string {
 	return strings.Join(times, ", ")
 }
 
-// weekdayAllowed reports whether wd passes the weekday filter of dr.
+// weekdayAllowed reports whether wd passes the weekday filter of slot.
 // An empty Weekdays slice means all days are allowed.
-func weekdayAllowed(dr model.DateRange, wd time.Weekday) bool {
-	if len(dr.Weekdays) == 0 {
+func weekdayAllowed(slot model.Slot, wd time.Weekday) bool {
+	if len(slot.Weekdays) == 0 {
 		return true
 	}
 	abbr := wd.String()[:3]
-	for _, w := range dr.Weekdays {
+	for _, w := range slot.Weekdays {
 		if w == abbr {
 			return true
 		}
