@@ -282,3 +282,75 @@ func TestFindSchedule_ExceptionRemapsWeekday(t *testing.T) {
 		t.Fatalf("expected match when effectiveWeekday=Sunday")
 	}
 }
+
+func TestFindSchedule_FirstShiftTimeFromSlot(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	ft := "09:30"
+	slot := model.Slot{FirstShiftTime: &ft}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.FirstShiftTime == nil || *rr.FirstShiftTime != "09:30" {
+		t.Fatalf("expected FirstShiftTime=09:30, got %v", rr.FirstShiftTime)
+	}
+}
+
+func TestFindSchedule_FirstShiftTimeOverriddenByGroup(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	slotFT := "09:30"
+	grpFT := "08:00"
+	grp := model.StartTimeGroup{Times: []string{"10:00"}, FirstShiftTime: &grpFT}
+	slot := model.Slot{FirstShiftTime: &slotFT, StartTimes: []model.StartTimeGroup{grp}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.FirstShiftTime == nil || *rr.FirstShiftTime != "08:00" {
+		t.Fatalf("expected group FirstShiftTime=08:00 to override slot 09:30, got %v", rr.FirstShiftTime)
+	}
+}
+
+func TestFindSchedule_FirstShiftCountFromSlot(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	count := 2
+	slot := model.Slot{FirstShiftCount: &count}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.FirstShiftCount == nil || *rr.FirstShiftCount != 2 {
+		t.Fatalf("expected FirstShiftCount=2, got %v", rr.FirstShiftCount)
+	}
+}
+
+func TestFindSchedule_FirstShiftCountOverriddenByGroup(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	slotCount := 2
+	grpCount := 3
+	grp := model.StartTimeGroup{Times: []string{"10:00"}, FirstShiftCount: &grpCount}
+	slot := model.Slot{FirstShiftCount: &slotCount, StartTimes: []model.StartTimeGroup{grp}}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.FirstShiftCount == nil || *rr.FirstShiftCount != 3 {
+		t.Fatalf("expected group FirstShiftCount=3 to override slot count=2, got %v", rr.FirstShiftCount)
+	}
+}

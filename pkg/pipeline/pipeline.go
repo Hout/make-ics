@@ -28,7 +28,9 @@ type Event struct {
 // IterEvents reads the first sheet of the workbook and returns generated events.
 // It applies scheduling rules from shiftTypes, uses schedule/slot overrides,
 // and produces localized descriptions via the provided Localizer.
-func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, seasons map[string]model.Season, exceptions map[string]model.Exception, loc *i18n.Localizer) ([]Event, error) {
+// lines is the LineMap returned by config.LoadConfig and is used to include
+// source line numbers in warnings and errors; it may be nil.
+func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, seasons map[string]model.Season, exceptions map[string]model.Exception, lines map[string]int, loc *i18n.Localizer) ([]Event, error) {
 	sheet := f.GetSheetName(0)
 	rows, err := f.GetRows(sheet)
 	if err != nil {
@@ -68,16 +70,23 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		}{Code: code, Date: tdate, Hour: h, Min: m})
 	}
 
-	// determine first/last per (code,date)
-	firstIdx := make(map[string]int)
+	// determine last/position per (code,date)
 	lastIdx := make(map[string]int)
+	groupOrder := make(map[string][]int)
 	for i, p := range parsed {
 		key := fmt.Sprintf("%s|%s", p.Code, p.Date.Format("2006-01-02"))
-		if _, ok := firstIdx[key]; !ok {
-			firstIdx[key] = i
-		}
 		lastIdx[key] = i
+		groupOrder[key] = append(groupOrder[key], i)
 	}
+	// positionOf maps each row index to its 0-based position within its (code, date) group.
+	positionOf := make(map[int]int, len(parsed))
+	for _, indices := range groupOrder {
+		for pos, idx := range indices {
+			positionOf[idx] = pos
+		}
+	}
+
+	warnedCrossLevel := make(map[string]bool)
 
 	locTZ, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -87,7 +96,6 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 	var events []Event
 	for i, p := range parsed {
 		key := fmt.Sprintf("%s|%s", p.Code, p.Date.Format("2006-01-02"))
-		isFirst := firstIdx[key] == i
 		isLast := lastIdx[key] == i
 
 		// resolve shift type; unknown codes use a zero-value ShiftType (all pointer
@@ -97,14 +105,66 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		eff := dr.EffectiveWeekday(p.Date, exceptions)
 		rangeEntry := dr.FindSchedule(shift.Schedules, p.Date, startTime, eff, seasons)
 
+		// resolve effective first-shift count (how many leading shifts get the advance)
+		effectiveCount := 1
+		if rangeEntry != nil && rangeEntry.FirstShiftCount != nil {
+			effectiveCount = *rangeEntry.FirstShiftCount
+		} else if hasShift && shift.FirstShiftCount != nil {
+			effectiveCount = *shift.FirstShiftCount
+		}
+
+		// resolve first_shift_time and first_shift_advance independently so
+		// cross-level conflicts (one from range, other from shift) can be detected.
+		var effectiveFirstTime *string
+		var effectiveFirstTimeSrc string
+		var effectiveFirstAdvance *int
+		var effectiveFirstAdvanceSrc string
+		if rangeEntry != nil {
+			if rangeEntry.FirstShiftTime != nil {
+				effectiveFirstTime = rangeEntry.FirstShiftTime
+				effectiveFirstTimeSrc = rangeEntry.FirstShiftTimeSrc
+			}
+			if rangeEntry.FirstAdvance != nil {
+				effectiveFirstAdvance = rangeEntry.FirstAdvance
+				effectiveFirstAdvanceSrc = rangeEntry.FirstAdvanceSrc
+			}
+		}
+		if effectiveFirstTime == nil && hasShift && shift.FirstShiftTime != nil {
+			effectiveFirstTime = shift.FirstShiftTime
+			effectiveFirstTimeSrc = "" // ShiftType level
+		}
+		if effectiveFirstAdvance == nil && hasShift && shift.FirstShiftAdv != nil {
+			effectiveFirstAdvance = shift.FirstShiftAdv
+			effectiveFirstAdvanceSrc = "" // ShiftType level
+		}
+		if effectiveFirstTime != nil && effectiveFirstAdvance != nil && !warnedCrossLevel[p.Code] {
+			warnedCrossLevel[p.Code] = true
+			timeInfo := lineForShiftField(p.Code, effectiveFirstTimeSrc, "first_shift_time", lines)
+			advInfo := lineForShiftField(p.Code, effectiveFirstAdvanceSrc, "first_shift_advance", lines)
+			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_time%s and first_shift_advance%s set at different levels; first_shift_time prevails\n",
+				p.Code, timeInfo, advInfo)
+		}
+
 		// advance precedence
 		var advance int
-		if isFirst {
-			if rangeEntry != nil && rangeEntry.FirstAdvance != nil {
-				advance = *rangeEntry.FirstAdvance
-			} else if hasShift && shift.FirstShiftAdv != nil {
-				advance = *shift.FirstShiftAdv
-			} else {
+		if positionOf[i] < effectiveCount {
+			switch {
+			case effectiveFirstTime != nil:
+				ft, err := time.Parse("15:04", *effectiveFirstTime)
+				if err != nil {
+					return nil, fmt.Errorf("shift %s: invalid first_shift_time %q: %v", p.Code, *effectiveFirstTime, err)
+				}
+				firstTimeMinutes := ft.Hour()*60 + ft.Minute()
+				departureMinutes := p.Hour*60 + p.Min
+				if firstTimeMinutes >= departureMinutes {
+					lineInfo := lineForShiftField(p.Code, effectiveFirstTimeSrc, "first_shift_time", lines)
+					return nil, fmt.Errorf("shift %s on %s: first_shift_time %q%s is at or after departure %02d:%02d",
+						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstTime, lineInfo, p.Hour, p.Min)
+				}
+				advance = departureMinutes - firstTimeMinutes
+			case effectiveFirstAdvance != nil:
+				advance = *effectiveFirstAdvance
+			default:
 				advance = defaultAdvanceMinutes
 			}
 		} else {
@@ -170,4 +230,24 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		events = append(events, ev)
 	}
 	return events, nil
+}
+
+// lineForShiftField returns " (line N)" when lines contains the YAML path for
+// field within the given shift code and source path, otherwise returns "".
+// srcPath is the relative path within the ShiftType (e.g. "schedules[0].slots[1]");
+// an empty srcPath means the field is at ShiftType level.
+func lineForShiftField(code, srcPath, field string, lines map[string]int) string {
+	if lines == nil {
+		return ""
+	}
+	var fullPath string
+	if srcPath == "" {
+		fullPath = "shift_type." + code + "." + field
+	} else {
+		fullPath = "shift_type." + code + "." + srcPath + "." + field
+	}
+	if n, ok := lines[fullPath]; ok {
+		return fmt.Sprintf(" (line %d)", n)
+	}
+	return ""
 }

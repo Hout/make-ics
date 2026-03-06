@@ -10,18 +10,13 @@ exceptions:
 
 # Named seasons: each season is a list of {from, to} date windows.
 seasons:
-  spring_early:
+  laagseizoen:
     - {from: 2026-04-01, to: 2026-04-17}
-  spring_late:
-    - {from: 2026-04-18, to: 2026-06-28}
-  spring_full:
-    - {from: 2026-04-01, to: 2026-06-28}
-  summer:
-    - {from: 2026-06-29, to: 2026-08-31}
-  autumn:
     - {from: 2026-09-01, to: 2026-10-31}
-  full_season:
-    - {from: 2026-04-01, to: 2026-10-31}
+  middenseizoen:
+    - {from: 2026-04-18, to: 2026-06-28}
+  hoogseizoen:
+    - {from: 2026-06-29, to: 2026-08-31}
 
 # YAML anchors for weekday lists — these keys are ignored by the Go model.
 _weekdays:
@@ -37,17 +32,21 @@ shift_type:
     trips: 3
     trip_duration: 50
     break_duration: 30
-    first_shift_advance: 45
+    first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [spring_early]
+      - seasons: [laagseizoen]
         slots:
           - weekdays: *wkdays
+            first_shift_time: "9:15"
+            first_shift_count: 2
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
               - times: ["14:40", "15:00"]
                 trips: 2
           - weekdays: *weekend
+            first_shift_time: "9:15"
+            first_shift_count: 2
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
@@ -55,48 +54,25 @@ shift_type:
               - times: ["14:00", "14:20"]
               - times: ["14:40", "15:00"]
                 trips: 2
-      - seasons: [spring_late]
+      - seasons: [middenseizoen]
         slots:
           - weekdays: *no_mon
+            first_shift_time: "9:15"
+            first_shift_count: 2
             start_times:
-              - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40"]
-              - times: ["15:00"]
-                trips: 2
+              - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
             start_times:
-              - times: ["14:00"]
-                trips: 3
-              - times: ["14:20", "14:40", "15:00"]
-      - seasons: [summer]
+              - times: ["14:00", "14:20", "14:40", "15:00"]
+      - seasons: [hoogseizoen]
         slots:
           - weekdays: *no_mon
-            first_shift_advance: 60
+            first_shift_time: "9:15"
             start_times:
-              - times: ["10:20", "11:00", "14:00", "15:00"]
-                trips: 3
-              - times: ["10:00", "10:40", "11:20", "14:20", "14:40"]
+              - times: ["10:00", "10:20", "10:40", "11:00", "14:00", "14:20", "14:40", "15:00"]
           - weekdays: *mon
             start_times:
-              - times: ["14:00", "15:00"]
-                trips: 3
-              - times: ["14:20", "14:40"]
-      - seasons: [autumn]
-        slots:
-          - weekdays: *no_mon
-            first_shift_advance: 30
-            start_times:
-              - times: ["10:20", "14:40"]
-                trips: 1
-              - times: ["10:40", "11:00", "14:00", "14:20"]
-              - times: ["15:00"]
-                trips: 2
-          - weekdays: *mon
-            start_times:
-              - times: ["14:00", "14:20"]
-              - times: ["14:40"]
-                trips: 1
-              - times: ["15:00"]
-                trips: 2
+              - times: ["14:00", "14:20", "14:40", "15:00"]
   HRv_:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
@@ -106,7 +82,7 @@ shift_type:
     first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [spring_full, autumn]
+      - seasons: [laagseizoen, middenseizoen]
         slots:
           - weekdays: *wkdays
             start_times:
@@ -114,7 +90,7 @@ shift_type:
           - weekdays: *weekend
             start_times:
               - times: ["11:15", "13:15", "15:15"]
-      - seasons: [summer]
+      - seasons: [hoogseizoen]
         slots:
           - weekdays: *no_mon
             start_times:
@@ -131,7 +107,7 @@ shift_type:
     first_shift_advance: 60
     last_shift_remains: 30
     schedules:
-      - seasons: [full_season]
+      - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
           - weekdays: *no_mon
             start_times:
@@ -145,7 +121,7 @@ shift_type:
     first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [full_season]
+      - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
           - weekdays: *no_mon
             start_times:
@@ -158,12 +134,12 @@ shift_type:
     first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [spring_full, autumn]
+      - seasons: [laagseizoen, middenseizoen]
         slots:
           - weekdays: *no_mon
             start_times:
               - times: ["10:30", "10:45", "12:50", "13:05"]
-      - seasons: [summer]
+      - seasons: [hoogseizoen]
         slots:
           - weekdays: *no_mon
             start_times:
@@ -179,7 +155,7 @@ shift_type:
     first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [full_season]
+      - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
           - weekdays: *weekend
             start_times:
@@ -192,7 +168,7 @@ shift_type:
     first_shift_advance: 30
     last_shift_remains: 30
     schedules:
-      - seasons: [full_season]
+      - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
           - weekdays: *no_mon
             start_times:

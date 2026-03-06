@@ -45,17 +45,17 @@ func Run(args []string) error {
 	}
 
 	// load config: try external file, fall back to embedded default
-	cfg, err := config.LoadConfig(*cfgPath)
+	cfg, lines, err := config.LoadConfig(*cfgPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 	if config.IsEmpty(cfg) {
-		cfg, err = config.LoadConfigFromBytes(embeddedConfig)
+		cfg, lines, err = config.LoadConfigFromBytes(embeddedConfig)
 		if err != nil {
 			return fmt.Errorf("failed to load embedded config: %w", err)
 		}
 	}
-	if err := config.ValidateConfig(cfg, *cfgPath); err != nil {
+	if err := config.ValidateConfig(cfg, *cfgPath, lines); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func Run(args []string) error {
 	}
 	defer wb.Close()
 
-	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, cfg.Seasons, cfg.Exceptions, loc)
+	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, cfg.Seasons, cfg.Exceptions, lines, loc)
 	if err != nil {
 		return fmt.Errorf("failed to build events: %w", err)
 	}

@@ -77,11 +77,11 @@ func Run(args []string) error {
 		return err
 	}
 
-	cfg, err := config.LoadConfig(*cfgPath)
+	cfg, lines, err := config.LoadConfig(*cfgPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	if err := config.ValidateConfig(cfg, *cfgPath); err != nil {
+	if err := config.ValidateConfig(cfg, *cfgPath, lines); err != nil {
 		return err
 	}
 

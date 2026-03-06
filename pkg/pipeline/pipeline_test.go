@@ -29,7 +29,7 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	shifts := map[string]model.ShiftType{"A": st}
 
 	loc, _ := i18n.NewLocalizer("nl")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestIterEvents_CodeTrimsWhitespace(t *testing.T) {
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "Binnendieze HRM"}}
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestIterEvents_SkipsNonDataRows(t *testing.T) {
 	f.SetCellValue(sheet, "C2", "14:40 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestIterEvents_SkipsRowWithUnparseableTime(t *testing.T) {
 	f.SetCellValue(s, "C1", "geen-tijd")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestIterEvents_AfspraakFallback(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestIterEvents_ShiftDescriptionAppended(t *testing.T) {
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "HRM", Description: "Some route detail"}}
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestIterEvents_EventDatetimesTimezoneAware(t *testing.T) {
 	f.SetCellValue(s, "C1", "14:40 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 
 	// Without exception: 2026-04-06 is Monday → Sat/Sun slot doesn't match →
 	// rangeEntry=nil → trips=nil → 4h (240min) default duration + 30min remains = 270min.
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, seasons, nil, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, seasons, nil, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 
 	// With exception remapping to Sunday: Sat/Sun slot matches → trips=1, tripDur=50
 	// → duration = 50min + 30min remains = 80min.
-	events, err = IterEvents(f, 30, "Europe/Amsterdam", shifts, seasons, exceptions, loc)
+	events, err = IterEvents(f, 30, "Europe/Amsterdam", shifts, seasons, exceptions, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -247,5 +247,110 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 	tripEnd := time.Date(2026, 4, 6, 12, 10, 0, 0, events[0].DtEnd.Location()).Add(80 * time.Minute)
 	if !events[0].DtEnd.Equal(tripEnd) {
 		t.Fatalf("with exception: DtEnd want %v got %v", tripEnd, events[0].DtEnd)
+	}
+}
+
+func TestIterEvents_FirstShiftCount(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "10:00")
+	f.SetCellValue(s, "A2", "03-apr-26")
+	f.SetCellValue(s, "B2", "A")
+	f.SetCellValue(s, "C2", "12:00")
+	f.SetCellValue(s, "A3", "03-apr-26")
+	f.SetCellValue(s, "B3", "A")
+	f.SetCellValue(s, "C3", "14:00")
+
+	adv := 45
+	count := 2
+	st := model.ShiftType{FirstShiftAdv: &adv, FirstShiftCount: &count}
+	loc, _ := i18n.NewLocalizer("en")
+	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("expected 3 events got %d", len(events))
+	}
+	tz := events[0].DtStart.Location()
+	// positions 0 and 1 (10:00, 12:00) get 45m advance; position 2 (14:00) gets default 10m
+	want0 := time.Date(2026, 4, 3, 10, 0, 0, 0, tz).Add(-45 * time.Minute)
+	want1 := time.Date(2026, 4, 3, 12, 0, 0, 0, tz).Add(-45 * time.Minute)
+	want2 := time.Date(2026, 4, 3, 14, 0, 0, 0, tz).Add(-10 * time.Minute)
+	if !events[0].DtStart.Equal(want0) {
+		t.Fatalf("shift 0: DtStart want %v got %v", want0, events[0].DtStart)
+	}
+	if !events[1].DtStart.Equal(want1) {
+		t.Fatalf("shift 1: DtStart want %v got %v", want1, events[1].DtStart)
+	}
+	if !events[2].DtStart.Equal(want2) {
+		t.Fatalf("shift 2: DtStart want %v got %v", want2, events[2].DtStart)
+	}
+}
+
+func TestIterEvents_FirstShiftTime(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "10:00")
+	f.SetCellValue(s, "A2", "03-apr-26")
+	f.SetCellValue(s, "B2", "A")
+	f.SetCellValue(s, "C2", "12:00")
+
+	ft := "09:15" // advance for 10:00 departure = 45m; 12:00 uses default
+	st := model.ShiftType{FirstShiftTime: &ft}
+	loc, _ := i18n.NewLocalizer("en")
+	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events got %d", len(events))
+	}
+	tz := events[0].DtStart.Location()
+	// first shift: 10:00 - 09:15 = 45m advance → DtStart 09:15
+	want0 := time.Date(2026, 4, 3, 9, 15, 0, 0, tz)
+	// second shift: default 10m advance
+	want1 := time.Date(2026, 4, 3, 12, 0, 0, 0, tz).Add(-10 * time.Minute)
+	if !events[0].DtStart.Equal(want0) {
+		t.Fatalf("first shift DtStart want %v got %v", want0, events[0].DtStart)
+	}
+	if !events[1].DtStart.Equal(want1) {
+		t.Fatalf("second shift DtStart want %v got %v", want1, events[1].DtStart)
+	}
+}
+
+func TestIterEvents_FirstShiftTimeAtOrAfterDeparture_Error(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "10:00")
+
+	ft := "10:00" // equal to departure → must error
+	st := model.ShiftType{FirstShiftTime: &ft}
+	loc, _ := i18n.NewLocalizer("en")
+	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
+	if err == nil {
+		t.Fatalf("expected error when first_shift_time >= departure")
+	}
+}
+
+func TestIterEvents_FirstShiftTimeAfterDeparture_Error(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "10:00")
+
+	ft := "11:00" // after departure → must error
+	st := model.ShiftType{FirstShiftTime: &ft}
+	loc, _ := i18n.NewLocalizer("en")
+	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
+	if err == nil {
+		t.Fatalf("expected error when first_shift_time > departure")
 	}
 }

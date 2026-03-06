@@ -1,6 +1,7 @@
 package drange
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,12 +10,19 @@ import (
 
 // ResolvedRange represents the merged result of a Schedule Slot and an optional
 // StartTimeGroup override. Fields are pointers to distinguish missing values.
+// The Src fields record the relative YAML path (within the ShiftType) of the
+// struct that contributed that field, for line-number annotations in warnings
+// and errors. An empty string means ShiftType level.
 type ResolvedRange struct {
-	Trips         *int
-	TripDuration  *int
-	BreakDuration *int
-	FirstAdvance  *int
-	LastRemains   *int
+	Trips             *int
+	TripDuration      *int
+	BreakDuration     *int
+	FirstAdvance      *int
+	FirstShiftTime    *string
+	FirstShiftCount   *int
+	LastRemains       *int
+	FirstAdvanceSrc   string // relative path of struct that set FirstAdvance
+	FirstShiftTimeSrc string // relative path of struct that set FirstShiftTime
 }
 
 // containsWeekday reports whether the abbreviation of wd (e.g. "Tue") is present
@@ -82,14 +90,26 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 }
 
 // resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
-func resolvedFromSlot(slot model.Slot) ResolvedRange {
-	return ResolvedRange{
-		Trips:         slot.Trips,
-		TripDuration:  slot.TripDuration,
-		BreakDuration: slot.BreakDuration,
-		FirstAdvance:  slot.FirstAdvance,
-		LastRemains:   slot.LastRemains,
+// resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
+// slotPath is the relative YAML path (e.g. "schedules[0].slots[1]") used for
+// line-number annotation of source fields.
+func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
+	rr := ResolvedRange{
+		Trips:           slot.Trips,
+		TripDuration:    slot.TripDuration,
+		BreakDuration:   slot.BreakDuration,
+		FirstAdvance:    slot.FirstAdvance,
+		FirstShiftTime:  slot.FirstShiftTime,
+		FirstShiftCount: slot.FirstShiftCount,
+		LastRemains:     slot.LastRemains,
 	}
+	if slot.FirstAdvance != nil {
+		rr.FirstAdvanceSrc = slotPath
+	}
+	if slot.FirstShiftTime != nil {
+		rr.FirstShiftTimeSrc = slotPath
+	}
+	return rr
 }
 
 // FindSchedule finds the first schedule whose seasons cover apptDate, then the
@@ -100,19 +120,21 @@ func resolvedFromSlot(slot model.Slot) ResolvedRange {
 // allowing exception dates to be treated as a different day of the week.
 // Returns nil when no schedule/slot matches.
 func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime string, effectiveWeekday time.Weekday, seasons map[string]model.Season) *ResolvedRange {
-	for _, sched := range schedules {
+	for si, sched := range schedules {
 		if !dateInSchedule(apptDate, sched, seasons) {
 			continue
 		}
-		for _, slot := range sched.Slots {
+		for sli, slot := range sched.Slots {
 			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
 				continue
 			}
+			slotPath := fmt.Sprintf("schedules[%d].slots[%d]", si, sli)
 			if startTime != "" {
-				for _, g := range slot.StartTimes {
+				for gi, g := range slot.StartTimes {
 					for _, tm := range g.Times {
 						if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
-							rr := resolvedFromSlot(slot)
+							rr := resolvedFromSlot(slot, slotPath)
+							grpPath := fmt.Sprintf("schedules[%d].slots[%d].start_times[%d]", si, sli, gi)
 							if g.Trips != nil {
 								rr.Trips = g.Trips
 							}
@@ -124,6 +146,14 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 							}
 							if g.FirstAdvance != nil {
 								rr.FirstAdvance = g.FirstAdvance
+								rr.FirstAdvanceSrc = grpPath
+							}
+							if g.FirstShiftTime != nil {
+								rr.FirstShiftTime = g.FirstShiftTime
+								rr.FirstShiftTimeSrc = grpPath
+							}
+							if g.FirstShiftCount != nil {
+								rr.FirstShiftCount = g.FirstShiftCount
 							}
 							if g.LastRemains != nil {
 								rr.LastRemains = g.LastRemains
@@ -133,7 +163,7 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 					}
 				}
 			}
-			rr := resolvedFromSlot(slot)
+			rr := resolvedFromSlot(slot, slotPath)
 			return &rr
 		}
 	}

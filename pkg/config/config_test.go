@@ -4,13 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
 func TestLoadConfig_MissingFile(t *testing.T) {
 	tmp := t.TempDir()
-	cfg, err := LoadConfig(filepath.Join(tmp, "nope.yaml"))
+	cfg, _, err := LoadConfig(filepath.Join(tmp, "nope.yaml"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -25,7 +26,7 @@ func TestLoadConfig_EmptyFile(t *testing.T) {
 	if err := os.WriteFile(p, []byte(""), 0o644); err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
-	cfg, err := LoadConfig(p)
+	cfg, _, err := LoadConfig(p)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,14 +42,107 @@ func TestValidateConfig_MissingKeys(t *testing.T) {
 	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
-	if err := ValidateConfig(cfg, path); err == nil {
+	if err := ValidateConfig(cfg, path, nil); err == nil {
 		t.Fatalf("expected error for missing keys")
 	}
 }
 
 func TestValidateConfig_InvalidTimezone(t *testing.T) {
 	cfg := model.Config{Timezone: "Not/A/Zone", Locale: "nl_NL", ShiftType: map[string]model.ShiftType{"A": {}}}
-	if err := ValidateConfig(cfg, "cfg.yaml"); err == nil {
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
 		t.Fatalf("expected error for invalid timezone")
+	}
+}
+
+func TestValidateConfig_BothFirstShiftFieldsOnShiftType(t *testing.T) {
+	adv := 30
+	ft := "09:00"
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		ShiftType: map[string]model.ShiftType{
+			"A": {FirstShiftAdv: &adv, FirstShiftTime: &ft},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error when both first_shift_advance and first_shift_time set on ShiftType")
+	}
+}
+
+func TestValidateConfig_BothFirstShiftFieldsOnSlot(t *testing.T) {
+	adv := 30
+	ft := "09:00"
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots:   []model.Slot{{FirstAdvance: &adv, FirstShiftTime: &ft}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error when both fields set on Slot")
+	}
+}
+
+func TestValidateConfig_BothFirstShiftFieldsOnStartTimeGroup(t *testing.T) {
+	adv := 30
+	ft := "09:00"
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{StartTimes: []model.StartTimeGroup{
+					{Times: []string{"10:00"}, FirstAdvance: &adv, FirstShiftTime: &ft},
+				}}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error when both fields set on StartTimeGroup")
+	}
+}
+
+func TestValidateConfig_InvalidFirstShiftTimeFormat(t *testing.T) {
+	ft := "9am"
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		ShiftType: map[string]model.ShiftType{
+			"A": {FirstShiftTime: &ft},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for invalid first_shift_time format")
+	}
+}
+
+func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
+	ft := "09:00"
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {
+				FirstShiftTime: &ft,
+				Schedules: []model.Schedule{{
+					Seasons: []string{"s"},
+					Slots:   []model.Slot{{}},
+				}},
+			},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("unexpected error for valid config: %v", err)
 	}
 }
