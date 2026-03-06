@@ -63,6 +63,7 @@ The Python implementation has been archived to `archive/python/` for reference o
 ## Shell / Terminal
 
 - **Never use heredocs** (`<<EOF ... EOF`) in terminal commands — they corrupt the shell session
+- **Never use `/tmp` for temporary storage** — use `.scratch/` in the workspace root instead (already in `.gitignore`)
 - Use `go run ./cmd/make-ics` for quick smoke-tests; use `go build -o make-ics ./cmd/make-ics` for a binary
 - Cross-compile with `GOOS=windows GOARCH=amd64 go build -o make-ics.exe ./cmd/make-ics`
 
