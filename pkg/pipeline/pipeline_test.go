@@ -354,3 +354,72 @@ func TestIterEvents_FirstShiftTimeAfterDeparture_Error(t *testing.T) {
 		t.Fatalf("expected error when first_shift_time > departure")
 	}
 }
+
+func TestIterEvents_FirstShiftDeterminedByScheduleNotPosition(t *testing.T) {
+	// The slot defines morning times (10:20, 10:40) as the only scheduled start
+	// times. A person assigned only 14:40 is NOT the "first shift of the day"
+	// according to the schedule — 10:20 and 10:40 are — so they should NOT get
+	// the first_shift_advance_time prep; they get the default advance instead.
+	from := model.DateRange{
+		From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+	}
+	seasons := map[string]model.Season{"s": {from}}
+	ft := "09:15"
+	shifts := map[string]model.ShiftType{
+		"A": {
+			FirstShiftAdvanceTime: &ft,
+			Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"10:20", "10:40"}},
+						{Times: []string{"14:40", "15:00"}},
+					},
+				}},
+			}},
+		},
+	}
+
+	// Afternoon-only assignment: 14:40 is not in the first scheduled times
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "03-apr-26")
+	f.SetCellValue(s, "B1", "A")
+	f.SetCellValue(s, "C1", "14:40")
+
+	loc, _ := i18n.NewLocalizer("en")
+	events, err := IterEvents(f, 15, "Europe/Amsterdam", shifts, seasons, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event got %d", len(events))
+	}
+	tz := events[0].DtStart.Location()
+	// 14:40 is NOT a first scheduled time → default 15m advance
+	wantStart := time.Date(2026, 4, 3, 14, 25, 0, 0, tz)
+	if !events[0].DtStart.Equal(wantStart) {
+		t.Fatalf("afternoon-only shift: DtStart want %v got %v", wantStart, events[0].DtStart)
+	}
+
+	// Morning assignment: 10:20 IS the first scheduled time → gets 9:15 prep
+	f2 := excelize.NewFile()
+	s2 := f2.GetSheetName(0)
+	f2.SetCellValue(s2, "A1", "03-apr-26")
+	f2.SetCellValue(s2, "B1", "A")
+	f2.SetCellValue(s2, "C1", "10:20")
+
+	events2, err := IterEvents(f2, 15, "Europe/Amsterdam", shifts, seasons, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events2) != 1 {
+		t.Fatalf("expected 1 event got %d", len(events2))
+	}
+	// 10:20 IS a first scheduled time → first_shift_advance_time "9:15"
+	wantStart2 := time.Date(2026, 4, 3, 9, 15, 0, 0, tz)
+	if !events2[0].DtStart.Equal(wantStart2) {
+		t.Fatalf("morning shift: DtStart want %v got %v", wantStart2, events2[0].DtStart)
+	}
+}

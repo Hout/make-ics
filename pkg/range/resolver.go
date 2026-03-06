@@ -2,6 +2,7 @@ package drange
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -110,6 +111,47 @@ func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
 		rr.FirstShiftAdvanceTimeSrc = slotPath
 	}
 	return rr
+}
+
+// FirstScheduledTimes returns the set of the chronologically first count
+// departure times (as "HH:MM" strings) from the slot that matches apptDate
+// and effectiveWeekday, by collecting and sorting all times across the slot's
+// start_times groups. Returns nil when no slot matches or the matched slot
+// defines no start_times (caller should fall back to positional ordering).
+func FirstScheduledTimes(schedules []model.Schedule, apptDate time.Time, effectiveWeekday time.Weekday, seasons map[string]model.Season, count int) map[string]bool {
+	for _, sched := range schedules {
+		if !dateInSchedule(apptDate, sched, seasons) {
+			continue
+		}
+		for _, slot := range sched.Slots {
+			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
+				continue
+			}
+			if len(slot.StartTimes) == 0 {
+				return nil
+			}
+			var mins []int
+			for _, g := range slot.StartTimes {
+				for _, tm := range g.Times {
+					t, err := time.Parse("15:04", strings.TrimSpace(tm))
+					if err != nil {
+						continue
+					}
+					mins = append(mins, t.Hour()*60+t.Minute())
+				}
+			}
+			sort.Ints(mins)
+			if count > len(mins) {
+				count = len(mins)
+			}
+			result := make(map[string]bool, count)
+			for _, m := range mins[:count] {
+				result[fmt.Sprintf("%02d:%02d", m/60, m%60)] = true
+			}
+			return result
+		}
+	}
+	return nil
 }
 
 // FindSchedule finds the first schedule whose seasons cover apptDate, then the

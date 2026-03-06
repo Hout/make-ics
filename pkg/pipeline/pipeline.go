@@ -70,7 +70,8 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		}{Code: code, Date: tdate, Hour: h, Min: m})
 	}
 
-	// determine last/position per (code,date)
+	// determine last per (code,date) for last_shift_remains;
+	// also track positional order as a fallback for shifts with no start_times in config.
 	lastIdx := make(map[string]int)
 	groupOrder := make(map[string][]int)
 	for i, p := range parsed {
@@ -78,7 +79,6 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		lastIdx[key] = i
 		groupOrder[key] = append(groupOrder[key], i)
 	}
-	// positionOf maps each row index to its 0-based position within its (code, date) group.
 	positionOf := make(map[int]int, len(parsed))
 	for _, indices := range groupOrder {
 		for pos, idx := range indices {
@@ -145,9 +145,21 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 				p.Code, timeInfo, advInfo)
 		}
 
+		// Determine whether this departure is among the first effectiveCount
+		// scheduled times for this slot. FirstScheduledTimes looks up the slot from
+		// config and returns the chronologically earliest N times; if no start_times
+		// are defined we fall back to positional order within the xlsx rows.
+		firstTimes := dr.FirstScheduledTimes(shift.Schedules, p.Date, eff, seasons, effectiveCount)
+		var isFirstShift bool
+		if firstTimes != nil {
+			isFirstShift = firstTimes[startTime]
+		} else {
+			isFirstShift = positionOf[i] < effectiveCount
+		}
+
 		// advance precedence
 		var advance int
-		if positionOf[i] < effectiveCount {
+		if isFirstShift {
 			switch {
 			case effectiveFirstAdvanceTime != nil:
 				ft, err := time.Parse("15:04", *effectiveFirstAdvanceTime)
