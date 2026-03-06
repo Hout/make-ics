@@ -21,7 +21,8 @@ type ResolvedRange struct {
 	FirstShiftAdvanceDuration    *int
 	FirstShiftAdvanceTime        *string
 	FirstShiftCount              *int
-	LastRemains                  *int
+	LastAftercare                *int
+	ShiftPreparation             *int
 	FirstShiftAdvanceDurationSrc string // relative path of struct that set FirstShiftAdvanceDuration
 	FirstShiftAdvanceTimeSrc     string // relative path of struct that set FirstShiftAdvanceTime
 }
@@ -102,7 +103,8 @@ func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
 		FirstShiftAdvanceDuration: slot.FirstShiftAdvanceDuration,
 		FirstShiftAdvanceTime:     slot.FirstShiftAdvanceTime,
 		FirstShiftCount:           slot.FirstShiftCount,
-		LastRemains:               slot.LastRemains,
+		LastAftercare:             slot.LastAftercare,
+		ShiftPreparation:          slot.ShiftPreparation,
 	}
 	if slot.FirstShiftAdvanceDuration != nil {
 		rr.FirstShiftAdvanceDurationSrc = slotPath
@@ -186,8 +188,8 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 								rr.BreakDuration = g.BreakDuration
 							}
 
-							if g.LastRemains != nil {
-								rr.LastRemains = g.LastRemains
+							if g.LastAftercare != nil {
+								rr.LastAftercare = g.LastAftercare
 							}
 							return &rr
 						}

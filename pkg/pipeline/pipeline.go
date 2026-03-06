@@ -180,14 +180,18 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 				advance = defaultAdvanceMinutes
 			}
 		} else {
-			advance = defaultAdvanceMinutes
+			if prep := schedule.GetShiftPreparation(shift, rangeEntry); prep != nil {
+				advance = *prep
+			} else {
+				advance = defaultAdvanceMinutes
+			}
 		}
 
 		trips := schedule.GetTrips(shift, rangeEntry)
 		durationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultAppointmentMinutes)
 		remains := 0
 		if isLast {
-			remains = schedule.GetLastShiftRemains(shift, rangeEntry)
+			remains = schedule.GetLastShiftAftercare(shift, rangeEntry)
 		}
 		durationMinutes += remains
 

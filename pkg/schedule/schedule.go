@@ -59,16 +59,29 @@ func GetShiftDurationMinutes(shift model.ShiftType, rangeEntry *dr.ResolvedRange
 	return n*td + max(0, n-1)*bd
 }
 
-// GetLastShiftRemains returns the extra minutes appended to the last shift of
+// GetLastShiftAftercare returns the extra minutes appended to the last shift of
 // a (code, date) group, with rangeEntry taking precedence over the shift setting.
-func GetLastShiftRemains(shift model.ShiftType, rangeEntry *dr.ResolvedRange) int {
-	if rangeEntry != nil && rangeEntry.LastRemains != nil {
-		return *rangeEntry.LastRemains
+func GetLastShiftAftercare(shift model.ShiftType, rangeEntry *dr.ResolvedRange) int {
+	if rangeEntry != nil && rangeEntry.LastAftercare != nil {
+		return *rangeEntry.LastAftercare
 	}
-	if shift.LastShiftRem != nil {
-		return *shift.LastShiftRem
+	if shift.LastShiftAftercare != nil {
+		return *shift.LastShiftAftercare
 	}
 	return 0
+}
+
+// GetShiftPreparation returns the per-shift preparation minutes used as the
+// advance for non-first shifts, with rangeEntry taking precedence over the
+// shift setting. Returns nil when not configured (caller uses its own default).
+func GetShiftPreparation(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && rangeEntry.ShiftPreparation != nil {
+		return rangeEntry.ShiftPreparation
+	}
+	if shift.ShiftPreparation != nil {
+		return shift.ShiftPreparation
+	}
+	return nil
 }
 
 // GetDurationRationale returns a human-readable breakdown of how the shift

@@ -9,7 +9,7 @@ type StartTimeGroup struct {
 	Trips         *int     `yaml:"trips,omitempty"`
 	TripDuration  *int     `yaml:"trip_duration,omitempty"`
 	BreakDuration *int     `yaml:"break_duration,omitempty"`
-	LastRemains   *int     `yaml:"last_shift_remains,omitempty"`
+	LastAftercare *int     `yaml:"last_shift_aftercare,omitempty"`
 }
 
 // DateRange is a date window [From, To] inclusive.
@@ -30,7 +30,8 @@ type Slot struct {
 	FirstShiftAdvanceDuration *int             `yaml:"first_shift_advance_duration,omitempty"`
 	FirstShiftAdvanceTime     *string          `yaml:"first_shift_advance_time,omitempty"`
 	FirstShiftCount           *int             `yaml:"first_shift_count,omitempty"`
-	LastRemains               *int             `yaml:"last_shift_remains,omitempty"`
+	LastAftercare             *int             `yaml:"last_shift_aftercare,omitempty"`
+	ShiftPreparation          *int             `yaml:"shift_preparation,omitempty"`
 	StartTimes                []StartTimeGroup `yaml:"start_times,omitempty"`
 }
 
@@ -50,7 +51,8 @@ type ShiftType struct {
 	FirstShiftAdvanceDuration *int       `yaml:"first_shift_advance_duration,omitempty"`
 	FirstShiftAdvanceTime     *string    `yaml:"first_shift_advance_time,omitempty"`
 	FirstShiftCount           *int       `yaml:"first_shift_count,omitempty"`
-	LastShiftRem              *int       `yaml:"last_shift_remains,omitempty"`
+	LastShiftAftercare        *int       `yaml:"last_shift_aftercare,omitempty"`
+	ShiftPreparation          *int       `yaml:"shift_preparation,omitempty"`
 	Schedules                 []Schedule `yaml:"schedules,omitempty"`
 }
 

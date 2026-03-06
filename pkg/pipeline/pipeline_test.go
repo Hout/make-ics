@@ -22,10 +22,10 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	f.SetCellValue(sheet, "B2", "A")
 	f.SetCellValue(sheet, "C2", "12:00")
 
-	// shift type with first_shift_advance=45 and last_shift_remains=30
+	// shift type with first_shift_advance=45 and last_shift_aftercare=30
 	adv := 45
 	rem := 30
-	st := model.ShiftType{Summary: "A Shift", FirstShiftAdvanceDuration: &adv, LastShiftRem: &rem}
+	st := model.ShiftType{Summary: "A Shift", FirstShiftAdvanceDuration: &adv, LastShiftAftercare: &rem}
 	shifts := map[string]model.ShiftType{"A": st}
 
 	loc, _ := i18n.NewLocalizer("nl")
@@ -211,7 +211,7 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 		"KHR_": {
 			Summary:                   "KHR",
 			FirstShiftAdvanceDuration: &adv,
-			LastShiftRem:              &rem,
+			LastShiftAftercare:        &rem,
 			Schedules:                 []model.Schedule{sunOnlySched},
 		},
 	}
