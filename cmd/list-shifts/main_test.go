@@ -60,7 +60,10 @@ func minimalConfig() model.Config {
 }
 
 func TestRenderShiftTable_ContainsSections(t *testing.T) {
-	out := renderShiftTable(minimalConfig())
+	out, err := renderShiftTable(minimalConfig())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	for _, want := range []string{
 		"## 01-Apr-26 > 30-Jun-26",
@@ -91,7 +94,10 @@ func TestFormatDateRange_CrossMonth(t *testing.T) {
 }
 
 func TestRenderShiftTable_WeekdayFilter(t *testing.T) {
-	out := renderShiftTable(minimalConfig())
+	out, err := renderShiftTable(minimalConfig())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Find the BBB_ section (Sat/Sun only).
 	lines := strings.Split(out, "\n")
@@ -126,7 +132,10 @@ func TestRenderShiftTable_WeekdayFilter(t *testing.T) {
 }
 
 func TestRenderShiftTable_SortedTimes(t *testing.T) {
-	out := renderShiftTable(minimalConfig())
+	out, err := renderShiftTable(minimalConfig())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	// In the Jul–Aug window AAA_ lists three times; 09:00 should appear
 	if !strings.Contains(out, "09:00") {
 		t.Errorf("expected time 09:00 in output")
@@ -165,7 +174,10 @@ func TestRenderShiftTable_NoDuplicateHeadings(t *testing.T) {
 		},
 	}
 
-	out := renderShiftTable(cfg)
+	out, err := renderShiftTable(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Must appear exactly once.
 	count := strings.Count(out, "### Binnendieze BBB")
@@ -337,5 +349,108 @@ func TestRenderMermaidCharts_Structure(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in mermaid output\nfull output:\n%s", want, out)
 		}
+	}
+}
+
+// --- mergedTimesForWeekday ---
+
+func TestMergedTimesForWeekday_TripsAnnotation(t *testing.T) {
+	tests := []struct {
+		name    string
+		group   []windowEntry
+		wd      time.Weekday
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "trips from ShiftType",
+			group: []windowEntry{{
+				code: "AAA_",
+				dr: model.DateRange{
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"14:00", "10:00"}},
+					},
+				},
+				shiftType: model.ShiftType{Trips: intPtr(2)},
+			}},
+			wd:   time.Monday,
+			want: "10:00(2), 14:00(2)",
+		},
+		{
+			name: "trips from DateRange overrides ShiftType",
+			group: []windowEntry{{
+				code: "AAA_",
+				dr: model.DateRange{
+					Trips: intPtr(3),
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"10:00"}},
+					},
+				},
+				shiftType: model.ShiftType{Trips: intPtr(1)},
+			}},
+			wd:   time.Monday,
+			want: "10:00(3)",
+		},
+		{
+			name: "trips from StartTimeGroup overrides DateRange and ShiftType",
+			group: []windowEntry{{
+				code: "AAA_",
+				dr: model.DateRange{
+					Trips: intPtr(2),
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"10:00"}, Trips: intPtr(5)},
+					},
+				},
+				shiftType: model.ShiftType{Trips: intPtr(1)},
+			}},
+			wd:   time.Monday,
+			want: "10:00(5)",
+		},
+		{
+			name: "trips nil at all levels returns error",
+			group: []windowEntry{{
+				code: "AAA_",
+				dr: model.DateRange{
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"10:00"}},
+					},
+				},
+				shiftType: model.ShiftType{},
+			}},
+			wd:      time.Monday,
+			wantErr: true,
+		},
+		{
+			name: "weekday excluded returns dash",
+			group: []windowEntry{{
+				code: "AAA_",
+				dr: model.DateRange{
+					Weekdays: []string{"Sat"},
+					StartTimes: []model.StartTimeGroup{
+						{Times: []string{"10:00"}},
+					},
+				},
+				shiftType: model.ShiftType{Trips: intPtr(2)},
+			}},
+			wd:   time.Monday,
+			want: "\u2013",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := mergedTimesForWeekday(tc.group, tc.wd)
+			if tc.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

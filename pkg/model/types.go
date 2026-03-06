@@ -39,9 +39,17 @@ type ShiftType struct {
 	DateRanges    []DateRange `yaml:"date_ranges,omitempty"`
 }
 
+// Exception remaps a specific calendar date to a different weekday for schedule
+// matching. The key in config.yaml is the ISO date string (e.g. "2026-04-06").
+type Exception struct {
+	Description string `yaml:"description,omitempty"`
+	Weekday     string `yaml:"weekday"`
+}
+
 // Config is the top-level structure of config.yaml.
 type Config struct {
-	Timezone  string               `yaml:"timezone"`
-	Locale    string               `yaml:"locale"`
-	ShiftType map[string]ShiftType `yaml:"shift_type"`
+	Timezone   string               `yaml:"timezone"`
+	Locale     string               `yaml:"locale"`
+	Exceptions map[string]Exception `yaml:"exceptions,omitempty"`
+	ShiftType  map[string]ShiftType `yaml:"shift_type"`
 }

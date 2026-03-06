@@ -73,7 +73,7 @@ func Run(args []string) error {
 	}
 	defer wb.Close()
 
-	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, loc)
+	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, cfg.Exceptions, loc)
 	if err != nil {
 		return fmt.Errorf("failed to build events: %w", err)
 	}

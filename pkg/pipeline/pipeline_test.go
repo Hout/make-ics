@@ -29,7 +29,7 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	shifts := map[string]model.ShiftType{"A": st}
 
 	loc, _ := i18n.NewLocalizer("nl")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestIterEvents_CodeTrimsWhitespace(t *testing.T) {
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "Binnendieze HRM"}}
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestIterEvents_SkipsNonDataRows(t *testing.T) {
 	f.SetCellValue(sheet, "C2", "14:40 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestIterEvents_SkipsRowWithUnparseableTime(t *testing.T) {
 	f.SetCellValue(s, "C1", "geen-tijd")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestIterEvents_AfspraakFallback(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestIterEvents_ShiftDescriptionAppended(t *testing.T) {
 
 	shifts := map[string]model.ShiftType{"HRm_": {Summary: "HRM", Description: "Some route detail"}}
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestIterEvents_EventDatetimesTimezoneAware(t *testing.T) {
 	f.SetCellValue(s, "C1", "14:40 uur")
 
 	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, loc)
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{}, nil, loc)
 	if err != nil {
 		t.Fatalf("IterEvents error: %v", err)
 	}
@@ -171,5 +171,75 @@ func TestIterEvents_EventDatetimesTimezoneAware(t *testing.T) {
 	}
 	if events[0].DtEnd.Location().String() == "" {
 		t.Fatalf("expected timezone-aware dtend")
+	}
+}
+
+func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
+	// 2026-04-06 is a Monday. The shift type only has a date range for
+	// Sat/Sun. Without an exception it would produce no event; with the
+	// exception remapping to Sunday it must produce one.
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "06-apr-26")
+	f.SetCellValue(s, "B1", "KHR_")
+	f.SetCellValue(s, "C1", "12:10 uur")
+
+	adv := 30
+	rem := 30
+	// Trips and TripDuration are only defined on the date range, NOT on the shift
+	// itself. This means:
+	//   - no date range match  → trips=nil → 4h (240min) default duration
+	//   - date range matches   → trips=1, tripDur=50 → 50min + 30min remains = 80min
+	drTrips := 1
+	drTripDur := 50
+	sunOnly := model.DateRange{
+		From:         time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+		To:           time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC),
+		Weekdays:     []string{"Sat", "Sun"},
+		Trips:        &drTrips,
+		TripDuration: &drTripDur,
+		StartTimes:   []model.StartTimeGroup{{Times: []string{"12:10"}}},
+	}
+	shifts := map[string]model.ShiftType{
+		"KHR_": {
+			Summary:       "KHR",
+			FirstShiftAdv: &adv,
+			LastShiftRem:  &rem,
+			DateRanges:    []model.DateRange{sunOnly},
+			// No top-level Trips/TripDuration — they come from the range only.
+		},
+	}
+	exceptions := map[string]model.Exception{
+		"2026-04-06": {Description: "Pasen", Weekday: "Sun"},
+	}
+
+	loc, _ := i18n.NewLocalizer("en")
+
+	// Without exception: 2026-04-06 is Monday → Sat/Sun range doesn't match →
+	// rangeEntry=nil → trips=nil → 4h (240min) default duration + 30min remains = 270min.
+	events, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	defaultEnd := time.Date(2026, 4, 6, 12, 10, 0, 0, events[0].DtEnd.Location()).Add(270 * time.Minute)
+	if !events[0].DtEnd.Equal(defaultEnd) {
+		t.Fatalf("without exception: DtEnd want %v got %v", defaultEnd, events[0].DtEnd)
+	}
+
+	// With exception remapping to Sunday: Sat/Sun range matches → trips=1, tripDur=50
+	// → duration = 50min + 30min remains = 80min.
+	events, err = IterEvents(f, 30, "Europe/Amsterdam", shifts, exceptions, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	tripEnd := time.Date(2026, 4, 6, 12, 10, 0, 0, events[0].DtEnd.Location()).Add(80 * time.Minute)
+	if !events[0].DtEnd.Equal(tripEnd) {
+		t.Fatalf("with exception: DtEnd want %v got %v", tripEnd, events[0].DtEnd)
 	}
 }

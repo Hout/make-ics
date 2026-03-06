@@ -77,7 +77,11 @@ func Run(args []string) error {
 	if *showMermaid {
 		fmt.Print(renderMermaidCharts(cfg))
 	} else {
-		fmt.Print(renderShiftTable(cfg))
+		out, err := renderShiftTable(cfg)
+		if err != nil {
+			return err
+		}
+		fmt.Print(out)
 	}
 	return nil
 }
@@ -86,7 +90,7 @@ func Run(args []string) error {
 // A sweep-line over all boundary dates produces non-overlapping intervals;
 // every shift type active in each interval is included in that section's table.
 // Weekdays with identical times are collapsed into a single row (e.g. Tue–Sun).
-func renderShiftTable(cfg model.Config) string {
+func renderShiftTable(cfg model.Config) (string, error) {
 	// Collect all entries and boundary dates.
 	var all []windowEntry
 	boundarySet := map[time.Time]struct{}{}
@@ -151,7 +155,11 @@ func renderShiftTable(cfg model.Config) string {
 
 			var content [7]string
 			for i, wd := range weekdayOrder {
-				content[i] = mergedTimesForWeekday(group, wd)
+				val, err := mergedTimesForWeekday(group, wd)
+				if err != nil {
+					return "", err
+				}
+				content[i] = val
 			}
 			for _, grp := range groupWeekdaysByContent(content) {
 				if grp.val == "\u2013" {
@@ -161,7 +169,7 @@ func renderShiftTable(cfg model.Config) string {
 			}
 		}
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
 // renderMermaidCharts produces a Markdown document where each date-range window
@@ -340,28 +348,48 @@ func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar 
 }
 
 // mergedTimesForWeekday unions the start times across all entries in a group for
-// the given weekday, returning a sorted, deduplicated, comma-joined string, or
-// "\u2013" if no entry contributes any times.
-func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) string {
-	seen := map[string]struct{}{}
-	var times []string
+// the given weekday, returning a sorted, deduplicated, comma-joined string with
+// trip count annotations (e.g. "10:00(2), 14:00(2)"), or "\u2013" if no entry
+// contributes any times. Trips are resolved via the three-level override chain
+// (StartTimeGroup \u2192 DateRange \u2192 ShiftType); an error is returned if trips
+// cannot be resolved for any start time.
+func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) (string, error) {
+	seen := map[string]string{} // bare time → formatted "HH:MM(N)"
+	var keys []string
 	for _, e := range group {
-		t := timesForWeekday(e.dr, wd)
-		if t == "\u2013" {
+		if !weekdayAllowed(e.dr, wd) {
 			continue
 		}
-		for _, s := range strings.Split(t, ", ") {
-			if _, exists := seen[s]; !exists {
-				seen[s] = struct{}{}
-				times = append(times, s)
+		for _, g := range e.dr.StartTimes {
+			var trips *int
+			if g.Trips != nil {
+				trips = g.Trips
+			} else if e.dr.Trips != nil {
+				trips = e.dr.Trips
+			} else {
+				trips = e.shiftType.Trips
+			}
+			for _, ts := range g.Times {
+				if _, exists := seen[ts]; exists {
+					continue
+				}
+				if trips == nil {
+					return "", fmt.Errorf("shift %q: no trips configured for start time %q", e.code, ts)
+				}
+				seen[ts] = fmt.Sprintf("%s(%d)", ts, *trips)
+				keys = append(keys, ts)
 			}
 		}
 	}
-	if len(times) == 0 {
-		return "\u2013"
+	if len(keys) == 0 {
+		return "\u2013", nil
 	}
-	sort.Strings(times)
-	return strings.Join(times, ", ")
+	sort.Strings(keys)
+	formatted := make([]string, len(keys))
+	for i, k := range keys {
+		formatted[i] = seen[k]
+	}
+	return strings.Join(formatted, ", "), nil
 }
 
 // timesForWeekday returns the sorted, comma-joined start times for wd in dr,

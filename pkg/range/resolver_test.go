@@ -16,7 +16,7 @@ func TestFindDateRange_GroupOverride(t *testing.T) {
 	dr := model.DateRange{From: from, To: to, StartTimes: []model.StartTimeGroup{grp}}
 
 	appt := time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00")
+	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00", appt.Weekday())
 	if rr == nil {
 		t.Fatalf("expected resolved range")
 	}
@@ -33,7 +33,7 @@ func TestFindDateRange_NoMatch(t *testing.T) {
 	to := time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)
 	dr := model.DateRange{From: from, To: to}
 	appt := time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00")
+	rr := FindDateRange([]model.DateRange{dr}, appt, "10:00", appt.Weekday())
 	if rr != nil {
 		t.Fatalf("expected nil for out-of-range date")
 	}
@@ -43,7 +43,7 @@ func TestFindDateRange_BoundaryFirstDay(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
 	dr := model.DateRange{From: from, To: to}
-	if FindDateRange([]model.DateRange{dr}, from, "") == nil {
+	if FindDateRange([]model.DateRange{dr}, from, "", from.Weekday()) == nil {
 		t.Fatalf("expected match on first day")
 	}
 }
@@ -52,13 +52,13 @@ func TestFindDateRange_BoundaryLastDay(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
 	dr := model.DateRange{From: from, To: to}
-	if FindDateRange([]model.DateRange{dr}, to, "") == nil {
+	if FindDateRange([]model.DateRange{dr}, to, "", to.Weekday()) == nil {
 		t.Fatalf("expected match on last day")
 	}
 }
 
 func TestFindDateRange_EmptyList(t *testing.T) {
-	if FindDateRange([]model.DateRange{}, time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), "") != nil {
+	if FindDateRange([]model.DateRange{}, time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), "", time.Monday) != nil {
 		t.Fatalf("expected nil for empty list")
 	}
 }
@@ -71,7 +71,7 @@ func TestFindDateRange_StartTimeMismatchReturnsEntry(t *testing.T) {
 	grp := model.StartTimeGroup{Times: []string{"14:40"}, Trips: &groupTrips}
 	dr := model.DateRange{From: from, To: to, FirstAdvance: &adv, StartTimes: []model.StartTimeGroup{grp}}
 
-	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00")
+	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday)
 	if rr == nil {
 		t.Fatalf("expected entry-level result on startTime mismatch")
 	}
@@ -88,7 +88,7 @@ func TestFindDateRange_GroupFieldOverridesEntry(t *testing.T) {
 	grp := model.StartTimeGroup{Times: []string{"09:00"}, Trips: &groupTrips}
 	dr := model.DateRange{From: from, To: to, Trips: &entryTrips, StartTimes: []model.StartTimeGroup{grp}}
 
-	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "09:00")
+	rr := FindDateRange([]model.DateRange{dr}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "09:00", time.Friday)
 	if rr == nil || rr.Trips == nil || *rr.Trips != 5 {
 		t.Fatalf("expected group trips=5 to override entry trips=2")
 	}
@@ -101,13 +101,13 @@ func TestFindDateRange_WeekdayMatch(t *testing.T) {
 
 	// 2026-04-07 is a Tuesday
 	tue := time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, tue, ""); rr == nil {
+	if rr := FindDateRange([]model.DateRange{dr}, tue, "", tue.Weekday()); rr == nil {
 		t.Fatalf("expected match on Tuesday")
 	}
 
 	// 2026-04-10 is a Friday
 	fri := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, fri, ""); rr == nil {
+	if rr := FindDateRange([]model.DateRange{dr}, fri, "", fri.Weekday()); rr == nil {
 		t.Fatalf("expected match on Friday")
 	}
 }
@@ -119,7 +119,7 @@ func TestFindDateRange_WeekdayNoMatch(t *testing.T) {
 
 	// 2026-04-08 is a Wednesday
 	wed := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
-	if rr := FindDateRange([]model.DateRange{dr}, wed, ""); rr != nil {
+	if rr := FindDateRange([]model.DateRange{dr}, wed, "", wed.Weekday()); rr != nil {
 		t.Fatalf("expected nil for Wednesday when weekdays=[Tue,Fri]")
 	}
 }
@@ -134,7 +134,7 @@ func TestFindDateRange_EmptyWeekdaysMatchesAll(t *testing.T) {
 		time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC),  // Tue
 		time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC), // Sat
 	} {
-		if rr := FindDateRange([]model.DateRange{dr}, d, ""); rr == nil {
+		if rr := FindDateRange([]model.DateRange{dr}, d, "", d.Weekday()); rr == nil {
 			t.Fatalf("expected match for %s with empty weekdays list", d.Weekday())
 		}
 	}
@@ -150,11 +150,64 @@ func TestFindDateRange_WeekdayFallThroughToSecondRange(t *testing.T) {
 
 	// Wednesday: should skip dr1 (weekday mismatch) and match dr2
 	wed := time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC)
-	rr := FindDateRange([]model.DateRange{dr1, dr2}, wed, "")
+	rr := FindDateRange([]model.DateRange{dr1, dr2}, wed, "", wed.Weekday())
 	if rr == nil {
 		t.Fatalf("expected match from second range on Wednesday")
 	}
 	if rr.Trips == nil || *rr.Trips != 9 {
 		t.Fatalf("expected trips=9 from second range, got %+v", rr.Trips)
+	}
+}
+
+func TestEffectiveWeekday(t *testing.T) {
+	exceptions := map[string]model.Exception{
+		"2026-04-06": {Weekday: "Sun"}, // 2026-04-06 is actually a Monday
+	}
+
+	tests := []struct {
+		name string
+		date time.Time
+		want time.Weekday
+	}{
+		{"exception remaps to Sunday", time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC), time.Sunday},
+		{"no exception uses natural weekday", time.Date(2026, 4, 7, 0, 0, 0, 0, time.UTC), time.Tuesday},
+		{"unknown abbr falls through", time.Date(2026, 4, 8, 0, 0, 0, 0, time.UTC), time.Wednesday},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EffectiveWeekday(tc.date, exceptions)
+			if got != tc.want {
+				t.Fatalf("EffectiveWeekday(%s) = %v, want %v", tc.date.Format("2006-01-02"), got, tc.want)
+			}
+		})
+	}
+}
+
+func TestEffectiveWeekday_UnknownAbbr(t *testing.T) {
+	exceptions := map[string]model.Exception{
+		"2026-04-06": {Weekday: "Xyz"}, // invalid abbreviation
+	}
+	date := time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC) // Monday
+	if got := EffectiveWeekday(date, exceptions); got != time.Monday {
+		t.Fatalf("expected natural Monday for unknown abbr, got %v", got)
+	}
+}
+
+func TestFindDateRange_ExceptionRemapsWeekday(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 17, 0, 0, 0, 0, time.UTC)
+	// Range only matches on Sat/Sun
+	dr := model.DateRange{From: from, To: to, Weekdays: []string{"Sat", "Sun"}}
+
+	// 2026-04-06 is a Monday — naturally would not match Sat/Sun range.
+	exceptionDate := time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC)
+
+	// Without exception: no match
+	if rr := FindDateRange([]model.DateRange{dr}, exceptionDate, "", exceptionDate.Weekday()); rr != nil {
+		t.Fatalf("expected nil without exception remap, got match")
+	}
+	// With exception remapping to Sunday: should match
+	if rr := FindDateRange([]model.DateRange{dr}, exceptionDate, "", time.Sunday); rr == nil {
+		t.Fatalf("expected match when effectiveWeekday=Sunday")
 	}
 }
