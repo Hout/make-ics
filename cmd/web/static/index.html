@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rooster → ICS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .logo {
+      font-size: 2.2rem;
+      text-align: center;
+      margin-bottom: .25rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: .25rem;
+    }
+
+    .subtitle {
+      font-size: .9rem;
+      color: #666;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    label.drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      border: 2px dashed #c5c9d6;
+      border-radius: 10px;
+      padding: 2rem 1rem;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      text-align: center;
+    }
+    label.drop-zone:hover,
+    label.drop-zone.dragover {
+      border-color: #4f6ef7;
+      background: #f0f3ff;
+    }
+    label.drop-zone .drop-icon { font-size: 2.5rem; }
+    label.drop-zone .drop-text { font-size: .95rem; color: #444; }
+    label.drop-zone .drop-hint { font-size: .8rem; color: #999; }
+
+    #file-input { display: none; }
+
+    #file-name {
+      margin-top: .75rem;
+      font-size: .85rem;
+      color: #4f6ef7;
+      text-align: center;
+      min-height: 1.2em;
+      word-break: break-all;
+    }
+
+    button[type="submit"] {
+      display: block;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: .8rem;
+      background: #4f6ef7;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .2s, opacity .2s;
+    }
+    button[type="submit"]:hover:not(:disabled) { background: #3a56e0; }
+    button[type="submit"]:disabled { opacity: .55; cursor: default; }
+
+    #status {
+      margin-top: 1rem;
+      min-height: 1.4em;
+      font-size: .88rem;
+      text-align: center;
+      color: #666;
+    }
+    #status.error { color: #d0312d; }
+
+    .how {
+      margin-top: 2rem;
+      border-top: 1px solid #eee;
+      padding-top: 1.25rem;
+    }
+    .how h2 {
+      font-size: .85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #999;
+      margin-bottom: .6rem;
+    }
+    .how ol {
+      padding-left: 1.2rem;
+      font-size: .88rem;
+      color: #555;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+<main class="card">
+  <div class="logo">🗓️</div>
+  <h1>Rooster → ICS</h1>
+  <p class="subtitle">Upload je xlsx-rooster en download een ICS-kalenderbestand.</p>
+
+  <form id="upload-form" method="POST" action="/convert" enctype="multipart/form-data">
+    <label class="drop-zone" for="file-input" id="drop-zone">
+      <span class="drop-icon">📂</span>
+      <span class="drop-text">Klik om een bestand te kiezen</span>
+      <span class="drop-hint">of sleep het hier naartoe — alleen .xlsx</span>
+    </label>
+    <input type="file" id="file-input" name="file" accept=".xlsx" required>
+    <div id="file-name"></div>
+
+    <button type="submit" id="submit-btn" disabled>Omzetten &amp; downloaden</button>
+    <div id="status"></div>
+  </form>
+
+  <section class="how">
+    <h2>Hoe werkt het?</h2>
+    <ol>
+      <li>Exporteer je rooster als <strong>.xlsx</strong> uit het planningssysteem.</li>
+      <li>Kies of sleep het bestand hierboven.</li>
+      <li>Klik op «Omzetten &amp; downloaden».</li>
+      <li>Importeer het gedownloade <strong>.ics</strong>-bestand in je agenda-app.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+  const input   = document.getElementById('file-input');
+  const zone    = document.getElementById('drop-zone');
+  const nameEl  = document.getElementById('file-name');
+  const btn     = document.getElementById('submit-btn');
+  const status  = document.getElementById('status');
+  const form    = document.getElementById('upload-form');
+
+  function setFile(file) {
+    if (!file) return;
+    nameEl.textContent = file.name;
+    btn.disabled = false;
+    status.textContent = '';
+    status.className = '';
+    // Replace the input's file list via DataTransfer
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+  }
+
+  input.addEventListener('change', () => setFile(input.files[0]));
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    setFile(e.dataTransfer.files[0]);
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    btn.disabled = true;
+    status.className = '';
+    status.textContent = 'Bezig met omzetten…';
+
+    const data = new FormData(form);
+    try {
+      const resp = await fetch('/convert', { method: 'POST', body: data });
+      if (!resp.ok) {
+        const msg = await resp.text();
+        status.className = 'error';
+        status.textContent = 'Fout: ' + msg.trim();
+        btn.disabled = false;
+        return;
+      }
+      // trigger browser download
+      const blob = await resp.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      const cd   = resp.headers.get('Content-Disposition') || '';
+      const m    = cd.match(/filename="([^"]+)"/);
+      a.href     = url;
+      a.download = m ? m[1] : 'rooster.ics';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      status.textContent = 'Klaar! Het ICS-bestand is gedownload.';
+      btn.disabled = false;
+    } catch (err) {
+      status.className = 'error';
+      status.textContent = 'Netwerkfout: ' + err.message;
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
