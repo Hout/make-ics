@@ -14,15 +14,15 @@ import (
 // struct that contributed that field, for line-number annotations in warnings
 // and errors. An empty string means ShiftType level.
 type ResolvedRange struct {
-	Trips             *int
-	TripDuration      *int
-	BreakDuration     *int
-	FirstAdvance      *int
-	FirstShiftTime    *string
-	FirstShiftCount   *int
-	LastRemains       *int
-	FirstAdvanceSrc   string // relative path of struct that set FirstAdvance
-	FirstShiftTimeSrc string // relative path of struct that set FirstShiftTime
+	Trips                        *int
+	TripDuration                 *int
+	BreakDuration                *int
+	FirstShiftAdvanceDuration    *int
+	FirstShiftAdvanceTime        *string
+	FirstShiftCount              *int
+	LastRemains                  *int
+	FirstShiftAdvanceDurationSrc string // relative path of struct that set FirstShiftAdvanceDuration
+	FirstShiftAdvanceTimeSrc     string // relative path of struct that set FirstShiftAdvanceTime
 }
 
 // containsWeekday reports whether the abbreviation of wd (e.g. "Tue") is present
@@ -95,19 +95,19 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 // line-number annotation of source fields.
 func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
 	rr := ResolvedRange{
-		Trips:           slot.Trips,
-		TripDuration:    slot.TripDuration,
-		BreakDuration:   slot.BreakDuration,
-		FirstAdvance:    slot.FirstAdvance,
-		FirstShiftTime:  slot.FirstShiftTime,
-		FirstShiftCount: slot.FirstShiftCount,
-		LastRemains:     slot.LastRemains,
+		Trips:                     slot.Trips,
+		TripDuration:              slot.TripDuration,
+		BreakDuration:             slot.BreakDuration,
+		FirstShiftAdvanceDuration: slot.FirstShiftAdvanceDuration,
+		FirstShiftAdvanceTime:     slot.FirstShiftAdvanceTime,
+		FirstShiftCount:           slot.FirstShiftCount,
+		LastRemains:               slot.LastRemains,
 	}
-	if slot.FirstAdvance != nil {
-		rr.FirstAdvanceSrc = slotPath
+	if slot.FirstShiftAdvanceDuration != nil {
+		rr.FirstShiftAdvanceDurationSrc = slotPath
 	}
-	if slot.FirstShiftTime != nil {
-		rr.FirstShiftTimeSrc = slotPath
+	if slot.FirstShiftAdvanceTime != nil {
+		rr.FirstShiftAdvanceTimeSrc = slotPath
 	}
 	return rr
 }
@@ -130,11 +130,10 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 			}
 			slotPath := fmt.Sprintf("schedules[%d].slots[%d]", si, sli)
 			if startTime != "" {
-				for gi, g := range slot.StartTimes {
+				for _, g := range slot.StartTimes {
 					for _, tm := range g.Times {
 						if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
 							rr := resolvedFromSlot(slot, slotPath)
-							grpPath := fmt.Sprintf("schedules[%d].slots[%d].start_times[%d]", si, sli, gi)
 							if g.Trips != nil {
 								rr.Trips = g.Trips
 							}
@@ -144,17 +143,7 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 							if g.BreakDuration != nil {
 								rr.BreakDuration = g.BreakDuration
 							}
-							if g.FirstAdvance != nil {
-								rr.FirstAdvance = g.FirstAdvance
-								rr.FirstAdvanceSrc = grpPath
-							}
-							if g.FirstShiftTime != nil {
-								rr.FirstShiftTime = g.FirstShiftTime
-								rr.FirstShiftTimeSrc = grpPath
-							}
-							if g.FirstShiftCount != nil {
-								rr.FirstShiftCount = g.FirstShiftCount
-							}
+
 							if g.LastRemains != nil {
 								rr.LastRemains = g.LastRemains
 							}

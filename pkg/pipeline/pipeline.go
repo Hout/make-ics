@@ -113,35 +113,35 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 			effectiveCount = *shift.FirstShiftCount
 		}
 
-		// resolve first_shift_time and first_shift_advance independently so
+		// resolve first_shift_advance_time and first_shift_advance_duration independently so
 		// cross-level conflicts (one from range, other from shift) can be detected.
-		var effectiveFirstTime *string
-		var effectiveFirstTimeSrc string
-		var effectiveFirstAdvance *int
-		var effectiveFirstAdvanceSrc string
+		var effectiveFirstAdvanceTime *string
+		var effectiveFirstAdvanceTimeSrc string
+		var effectiveFirstAdvanceDuration *int
+		var effectiveFirstAdvanceDurationSrc string
 		if rangeEntry != nil {
-			if rangeEntry.FirstShiftTime != nil {
-				effectiveFirstTime = rangeEntry.FirstShiftTime
-				effectiveFirstTimeSrc = rangeEntry.FirstShiftTimeSrc
+			if rangeEntry.FirstShiftAdvanceTime != nil {
+				effectiveFirstAdvanceTime = rangeEntry.FirstShiftAdvanceTime
+				effectiveFirstAdvanceTimeSrc = rangeEntry.FirstShiftAdvanceTimeSrc
 			}
-			if rangeEntry.FirstAdvance != nil {
-				effectiveFirstAdvance = rangeEntry.FirstAdvance
-				effectiveFirstAdvanceSrc = rangeEntry.FirstAdvanceSrc
+			if rangeEntry.FirstShiftAdvanceDuration != nil {
+				effectiveFirstAdvanceDuration = rangeEntry.FirstShiftAdvanceDuration
+				effectiveFirstAdvanceDurationSrc = rangeEntry.FirstShiftAdvanceDurationSrc
 			}
 		}
-		if effectiveFirstTime == nil && hasShift && shift.FirstShiftTime != nil {
-			effectiveFirstTime = shift.FirstShiftTime
-			effectiveFirstTimeSrc = "" // ShiftType level
+		if effectiveFirstAdvanceTime == nil && hasShift && shift.FirstShiftAdvanceTime != nil {
+			effectiveFirstAdvanceTime = shift.FirstShiftAdvanceTime
+			effectiveFirstAdvanceTimeSrc = "" // ShiftType level
 		}
-		if effectiveFirstAdvance == nil && hasShift && shift.FirstShiftAdv != nil {
-			effectiveFirstAdvance = shift.FirstShiftAdv
-			effectiveFirstAdvanceSrc = "" // ShiftType level
+		if effectiveFirstAdvanceDuration == nil && hasShift && shift.FirstShiftAdvanceDuration != nil {
+			effectiveFirstAdvanceDuration = shift.FirstShiftAdvanceDuration
+			effectiveFirstAdvanceDurationSrc = "" // ShiftType level
 		}
-		if effectiveFirstTime != nil && effectiveFirstAdvance != nil && !warnedCrossLevel[p.Code] {
+		if effectiveFirstAdvanceTime != nil && effectiveFirstAdvanceDuration != nil && !warnedCrossLevel[p.Code] {
 			warnedCrossLevel[p.Code] = true
-			timeInfo := lineForShiftField(p.Code, effectiveFirstTimeSrc, "first_shift_time", lines)
-			advInfo := lineForShiftField(p.Code, effectiveFirstAdvanceSrc, "first_shift_advance", lines)
-			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_time%s and first_shift_advance%s set at different levels; first_shift_time prevails\n",
+			timeInfo := lineForShiftField(p.Code, effectiveFirstAdvanceTimeSrc, "first_shift_advance_time", lines)
+			advInfo := lineForShiftField(p.Code, effectiveFirstAdvanceDurationSrc, "first_shift_advance_duration", lines)
+			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_advance_time%s and first_shift_advance_duration%s set at different levels; first_shift_advance_time prevails\n",
 				p.Code, timeInfo, advInfo)
 		}
 
@@ -149,21 +149,21 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 		var advance int
 		if positionOf[i] < effectiveCount {
 			switch {
-			case effectiveFirstTime != nil:
-				ft, err := time.Parse("15:04", *effectiveFirstTime)
+			case effectiveFirstAdvanceTime != nil:
+				ft, err := time.Parse("15:04", *effectiveFirstAdvanceTime)
 				if err != nil {
-					return nil, fmt.Errorf("shift %s: invalid first_shift_time %q: %v", p.Code, *effectiveFirstTime, err)
+					return nil, fmt.Errorf("shift %s: invalid first_shift_advance_time %q: %v", p.Code, *effectiveFirstAdvanceTime, err)
 				}
 				firstTimeMinutes := ft.Hour()*60 + ft.Minute()
 				departureMinutes := p.Hour*60 + p.Min
 				if firstTimeMinutes >= departureMinutes {
-					lineInfo := lineForShiftField(p.Code, effectiveFirstTimeSrc, "first_shift_time", lines)
-					return nil, fmt.Errorf("shift %s on %s: first_shift_time %q%s is at or after departure %02d:%02d",
-						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstTime, lineInfo, p.Hour, p.Min)
+					lineInfo := lineForShiftField(p.Code, effectiveFirstAdvanceTimeSrc, "first_shift_advance_time", lines)
+					return nil, fmt.Errorf("shift %s on %s: first_shift_advance_time %q%s is at or after departure %02d:%02d",
+						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstAdvanceTime, lineInfo, p.Hour, p.Min)
 				}
 				advance = departureMinutes - firstTimeMinutes
-			case effectiveFirstAdvance != nil:
-				advance = *effectiveFirstAdvance
+			case effectiveFirstAdvanceDuration != nil:
+				advance = *effectiveFirstAdvanceDuration
 			default:
 				advance = defaultAdvanceMinutes
 			}

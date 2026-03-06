@@ -61,7 +61,7 @@ func TestValidateConfig_BothFirstShiftFieldsOnShiftType(t *testing.T) {
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftAdv: &adv, FirstShiftTime: &ft},
+			"A": {FirstShiftAdvanceDuration: &adv, FirstShiftAdvanceTime: &ft},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
@@ -80,34 +80,12 @@ func TestValidateConfig_BothFirstShiftFieldsOnSlot(t *testing.T) {
 		ShiftType: map[string]model.ShiftType{
 			"A": {Schedules: []model.Schedule{{
 				Seasons: []string{"s"},
-				Slots:   []model.Slot{{FirstAdvance: &adv, FirstShiftTime: &ft}},
+				Slots:   []model.Slot{{FirstShiftAdvanceDuration: &adv, FirstShiftAdvanceTime: &ft}},
 			}}},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
 		t.Fatalf("expected error when both fields set on Slot")
-	}
-}
-
-func TestValidateConfig_BothFirstShiftFieldsOnStartTimeGroup(t *testing.T) {
-	adv := 30
-	ft := "09:00"
-	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
-	cfg := model.Config{
-		Timezone: "Europe/Amsterdam",
-		Locale:   "nl_NL",
-		Seasons:  map[string]model.Season{"s": {from}},
-		ShiftType: map[string]model.ShiftType{
-			"A": {Schedules: []model.Schedule{{
-				Seasons: []string{"s"},
-				Slots: []model.Slot{{StartTimes: []model.StartTimeGroup{
-					{Times: []string{"10:00"}, FirstAdvance: &adv, FirstShiftTime: &ft},
-				}}},
-			}}},
-		},
-	}
-	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error when both fields set on StartTimeGroup")
 	}
 }
 
@@ -117,7 +95,7 @@ func TestValidateConfig_InvalidFirstShiftTimeFormat(t *testing.T) {
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftTime: &ft},
+			"A": {FirstShiftAdvanceTime: &ft},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
@@ -134,7 +112,7 @@ func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
 		Seasons:  map[string]model.Season{"s": {from}},
 		ShiftType: map[string]model.ShiftType{
 			"A": {
-				FirstShiftTime: &ft,
+				FirstShiftAdvanceTime: &ft,
 				Schedules: []model.Schedule{{
 					Seasons: []string{"s"},
 					Slots:   []model.Slot{{}},

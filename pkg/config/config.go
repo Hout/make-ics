@@ -123,7 +123,7 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 	}
 	for code, st := range cfg.ShiftType {
 		loc := fmt.Sprintf("shift_type.%s", code)
-		if err := checkFirstShiftFields(st.FirstShiftAdv, st.FirstShiftTime, loc, lines); err != nil {
+		if err := checkFirstShiftFields(st.FirstShiftAdvanceDuration, st.FirstShiftAdvanceTime, loc, lines); err != nil {
 			return fmt.Errorf("config file %q: %s", path, err)
 		}
 		for si, sched := range st.Schedules {
@@ -140,34 +140,29 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 			}
 			for sli, slot := range sched.Slots {
 				slotLoc := fmt.Sprintf("shift_type.%s.schedules[%d].slots[%d]", code, si, sli)
-				if err := checkFirstShiftFields(slot.FirstAdvance, slot.FirstShiftTime, slotLoc, lines); err != nil {
+				if err := checkFirstShiftFields(slot.FirstShiftAdvanceDuration, slot.FirstShiftAdvanceTime, slotLoc, lines); err != nil {
 					return fmt.Errorf("config file %q: %s", path, err)
 				}
-				for gi, g := range slot.StartTimes {
-					grpLoc := fmt.Sprintf("shift_type.%s.schedules[%d].slots[%d].start_times[%d]", code, si, sli, gi)
-					if err := checkFirstShiftFields(g.FirstAdvance, g.FirstShiftTime, grpLoc, lines); err != nil {
-						return fmt.Errorf("config file %q: %s", path, err)
-					}
-				}
+				_ = slot.StartTimes // first_shift_* fields are not supported at start_times level
 			}
 		}
 	}
 	return nil
 }
 
-// checkFirstShiftFields returns an error when both first_shift_advance and
-// first_shift_time are set on the same struct, or when first_shift_time is not
-// a valid HH:MM string. When lines is non-nil the offending field's line number
+// checkFirstShiftFields returns an error when both first_shift_advance_duration and
+// first_shift_advance_time are set on the same struct, or when first_shift_advance_time
+// is not a valid HH:MM string. When lines is non-nil the offending field's line number
 // is appended to the error message.
 func checkFirstShiftFields(firstAdv *int, firstTime *string, location string, lines LineMap) error {
 	if firstAdv != nil && firstTime != nil {
-		anno := lineAnnotation(location+".first_shift_time", lines)
-		return fmt.Errorf("%s%s: may not set both first_shift_advance and first_shift_time", location, anno)
+		anno := lineAnnotation(location+".first_shift_advance_time", lines)
+		return fmt.Errorf("%s%s: may not set both first_shift_advance_duration and first_shift_advance_time", location, anno)
 	}
 	if firstTime != nil {
 		if _, err := time.Parse("15:04", *firstTime); err != nil {
-			anno := lineAnnotation(location+".first_shift_time", lines)
-			return fmt.Errorf("%s%s: invalid first_shift_time %q (expected HH:MM)", location, anno, *firstTime)
+			anno := lineAnnotation(location+".first_shift_advance_time", lines)
+			return fmt.Errorf("%s%s: invalid first_shift_advance_time %q (expected HH:MM)", location, anno, *firstTime)
 		}
 	}
 	return nil

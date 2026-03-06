@@ -25,7 +25,7 @@ func TestIterEvents_FirstLastAdvanceRemains(t *testing.T) {
 	// shift type with first_shift_advance=45 and last_shift_remains=30
 	adv := 45
 	rem := 30
-	st := model.ShiftType{Summary: "A Shift", FirstShiftAdv: &adv, LastShiftRem: &rem}
+	st := model.ShiftType{Summary: "A Shift", FirstShiftAdvanceDuration: &adv, LastShiftRem: &rem}
 	shifts := map[string]model.ShiftType{"A": st}
 
 	loc, _ := i18n.NewLocalizer("nl")
@@ -209,10 +209,10 @@ func TestIterEvents_ExceptionRemapsWeekday(t *testing.T) {
 	}
 	shifts := map[string]model.ShiftType{
 		"KHR_": {
-			Summary:       "KHR",
-			FirstShiftAdv: &adv,
-			LastShiftRem:  &rem,
-			Schedules:     []model.Schedule{sunOnlySched},
+			Summary:                   "KHR",
+			FirstShiftAdvanceDuration: &adv,
+			LastShiftRem:              &rem,
+			Schedules:                 []model.Schedule{sunOnlySched},
 		},
 	}
 	exceptions := map[string]model.Exception{
@@ -265,7 +265,7 @@ func TestIterEvents_FirstShiftCount(t *testing.T) {
 
 	adv := 45
 	count := 2
-	st := model.ShiftType{FirstShiftAdv: &adv, FirstShiftCount: &count}
+	st := model.ShiftType{FirstShiftAdvanceDuration: &adv, FirstShiftCount: &count}
 	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err != nil {
@@ -301,7 +301,7 @@ func TestIterEvents_FirstShiftTime(t *testing.T) {
 	f.SetCellValue(s, "C2", "12:00")
 
 	ft := "09:15" // advance for 10:00 departure = 45m; 12:00 uses default
-	st := model.ShiftType{FirstShiftTime: &ft}
+	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	events, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err != nil {
@@ -331,7 +331,7 @@ func TestIterEvents_FirstShiftTimeAtOrAfterDeparture_Error(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00")
 
 	ft := "10:00" // equal to departure → must error
-	st := model.ShiftType{FirstShiftTime: &ft}
+	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err == nil {
@@ -347,7 +347,7 @@ func TestIterEvents_FirstShiftTimeAfterDeparture_Error(t *testing.T) {
 	f.SetCellValue(s, "C1", "10:00")
 
 	ft := "11:00" // after departure → must error
-	st := model.ShiftType{FirstShiftTime: &ft}
+	st := model.ShiftType{FirstShiftAdvanceTime: &ft}
 	loc, _ := i18n.NewLocalizer("en")
 	_, err := IterEvents(f, 10, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
 	if err == nil {
