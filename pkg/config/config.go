@@ -132,7 +132,15 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 				if err := checkFirstShiftFields(slot.FirstShiftPreparationDuration, slot.FirstShiftPreparationTime, slotLoc, lines); err != nil {
 					return fmt.Errorf("config file %q: %s", path, err)
 				}
-				_ = slot.StartTimes // first_shift_* fields are not supported at start_times level
+				for gi, g := range slot.StartTimes {
+					for ti, tm := range g.Times {
+						if _, err := time.Parse("15:04", tm); err != nil {
+							timePath := fmt.Sprintf("%s.start_times[%d].times[%d]", slotLoc, gi, ti)
+							anno := lineAnnotation(timePath, lines)
+							return fmt.Errorf("config file %q: %s%s: invalid time %q (expected HH:MM)", path, timePath, anno, tm)
+						}
+					}
+				}
 			}
 		}
 	}

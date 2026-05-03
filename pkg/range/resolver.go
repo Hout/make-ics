@@ -132,10 +132,7 @@ func FirstScheduledTimes(schedules []model.Schedule, apptDate time.Time, effecti
 			var mins []int
 			for _, g := range slot.StartTimes {
 				for _, tm := range g.Times {
-					t, err := time.Parse("15:04", strings.TrimSpace(tm))
-					if err != nil {
-						continue
-					}
+					t, _ := time.Parse("15:04", strings.TrimSpace(tm))
 					mins = append(mins, t.Hour()*60+t.Minute())
 				}
 			}

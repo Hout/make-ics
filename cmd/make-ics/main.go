@@ -29,7 +29,7 @@ func main() {
 func Run(args []string) error {
 	fs := flag.NewFlagSet("make-ics", flag.ContinueOnError)
 	input := fs.String("input", "report.xlsx", "Path to the input xlsx file")
-	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file (uses compiled-in default if not found)")
+	cfgPath := fs.String("config", "cmd/make-ics/config.yaml", "Path to YAML config file")
 	// -c is an alias for -config; both write to the same pointer so the last one wins.
 	fs.StringVar(cfgPath, "c", *cfgPath, "Path to YAML config file (alias)")
 	if err := fs.Parse(args); err != nil {

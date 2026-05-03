@@ -100,6 +100,46 @@ func TestValidateConfig_InvalidFirstShiftTimeFormat(t *testing.T) {
 	}
 }
 
+func TestValidateConfig_InvalidStartTime(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					StartTimes: []model.StartTimeGroup{{Times: []string{"9am"}}},
+				}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for invalid start_times time format")
+	}
+}
+
+func TestValidateConfig_ValidStartTime(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					StartTimes: []model.StartTimeGroup{{Times: []string{"08:00", "13:30"}}},
+				}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("unexpected error for valid start_times: %v", err)
+	}
+}
+
 func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
 	ft := "09:00"
 	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
