@@ -182,18 +182,10 @@ func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, sh
 			case effectiveFirstPrepDuration != nil:
 				advance = *effectiveFirstPrepDuration
 			default:
-				if prep := schedule.GetShiftPreparationDuration(shift, rangeEntry); prep != nil {
-					advance = *prep
-				} else {
-					advance = defaultAdvanceMinutes
-				}
-			}
-		} else {
-			if prep := schedule.GetShiftPreparationDuration(shift, rangeEntry); prep != nil {
-				advance = *prep
-			} else {
 				advance = defaultAdvanceMinutes
 			}
+		} else {
+			advance = defaultAdvanceMinutes
 		}
 
 		trips := schedule.GetTrips(shift, rangeEntry)

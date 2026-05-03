@@ -53,7 +53,7 @@ shift_type:
     trips: 1
     trip_duration: 60
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen]
         slots:
@@ -76,11 +76,10 @@ shift_type:
 | `trips`                            | Number of trips per departure (default 1)                                       |
 | `trip_duration`                    | Duration of each trip in minutes (default 0)                                    |
 | `break_duration`                   | Break between trips in minutes (default 0)                                      |
-| `shift_preparation_duration`       | Advance minutes before any departure                                            |
 | `first_shift_preparation_duration` | Extra minutes before the first departure of the day                             |
 | `first_shift_preparation_time`     | Absolute clock time (HH:MM) to start before the first departure                 |
 | `first_shift_preparation_count`    | How many leading departures per day receive the first-shift advance (default 1) |
-| `last_shift_aftercare`             | Extra minutes added after the last departure of the day                         |
+| `last_shift_aftercare_duration`    | Extra minutes added after the last departure of the day                         |
 | `schedules`                        | Season-based schedule list (see below)                                          |
 
 Duration formula: `trips × trip_duration + max(0, trips − 1) × break_duration`

@@ -22,7 +22,6 @@ type ResolvedRange struct {
 	FirstShiftPreparationTime        *string
 	FirstShiftPreparationCount       *int
 	LastAftercare                    *int
-	ShiftPreparationDuration         *int
 	FirstShiftPreparationDurationSrc string // relative path of struct that set FirstShiftPreparationDuration
 	FirstShiftPreparationTimeSrc     string // relative path of struct that set FirstShiftPreparationTime
 }
@@ -104,7 +103,6 @@ func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
 		FirstShiftPreparationTime:     slot.FirstShiftPreparationTime,
 		FirstShiftPreparationCount:    slot.FirstShiftPreparationCount,
 		LastAftercare:                 slot.LastAftercare,
-		ShiftPreparationDuration:      slot.ShiftPreparationDuration,
 	}
 	if slot.FirstShiftPreparationDuration != nil {
 		rr.FirstShiftPreparationDurationSrc = slotPath

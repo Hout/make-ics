@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(go test *)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(go doc *)",
+      "Bash(git check-ignore *)"
+    ]
+  }
+}

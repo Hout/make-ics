@@ -423,28 +423,3 @@ func TestIterEvents_FirstShiftDeterminedByScheduleNotPosition(t *testing.T) {
 		t.Fatalf("morning shift: DtStart want %v got %v", wantStart2, events2[0].DtStart)
 	}
 }
-
-func TestIterEvents_FirstShiftFallsBackToShiftPreparationDuration(t *testing.T) {
-	f := excelize.NewFile()
-	s := f.GetSheetName(0)
-	f.SetCellValue(s, "A1", "03-apr-26")
-	f.SetCellValue(s, "B1", "A")
-	f.SetCellValue(s, "C1", "10:00")
-
-	prep := 20
-	st := model.ShiftType{ShiftPreparationDuration: &prep}
-	loc, _ := i18n.NewLocalizer("en")
-	events, err := IterEvents(f, 30, "Europe/Amsterdam", map[string]model.ShiftType{"A": st}, nil, nil, nil, loc)
-	if err != nil {
-		t.Fatalf("IterEvents error: %v", err)
-	}
-	if len(events) != 1 {
-		t.Fatalf("expected 1 event got %d", len(events))
-	}
-	tz := events[0].DtStart.Location()
-	// first shift, no first_shift_preparation_*, falls back to shift_preparation_duration=20
-	wantStart := time.Date(2026, 4, 3, 10, 0, 0, 0, tz).Add(-20 * time.Minute)
-	if !events[0].DtStart.Equal(wantStart) {
-		t.Fatalf("first shift fallback: DtStart want %v got %v", wantStart, events[0].DtStart)
-	}
-}

@@ -71,19 +71,6 @@ func GetLastShiftAftercare(shift model.ShiftType, rangeEntry *dr.ResolvedRange) 
 	return 0
 }
 
-// GetShiftPreparationDuration returns the per-shift preparation minutes, with
-// rangeEntry taking precedence over the shift setting. Returns nil when not
-// configured (caller uses its own default).
-func GetShiftPreparationDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
-	if rangeEntry != nil && rangeEntry.ShiftPreparationDuration != nil {
-		return rangeEntry.ShiftPreparationDuration
-	}
-	if shift.ShiftPreparationDuration != nil {
-		return shift.ShiftPreparationDuration
-	}
-	return nil
-}
-
 // GetDurationRationale returns a human-readable breakdown of how the shift
 // duration is computed, e.g. "3x40+2x10=140min+15min".
 func GetDurationRationale(shift model.ShiftType, rangeEntry *dr.ResolvedRange, trips *int, defaultMinutes int, lastShiftRemains int) string {

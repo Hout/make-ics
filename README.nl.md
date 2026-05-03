@@ -53,7 +53,7 @@ shift_type:
     trips: 1
     trip_duration: 60
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen]
         slots:
@@ -76,11 +76,10 @@ shift_type:
 | `trips`                            | Aantal ritten per vertrek (standaard 1)                                               |
 | `trip_duration`                    | Duur van elke rit in minuten (standaard 0)                                            |
 | `break_duration`                   | Pauze tussen ritten in minuten (standaard 0)                                          |
-| `shift_preparation_duration`       | Aankomsttijd vóór elk vertrek                                                         |
 | `first_shift_preparation_duration` | Extra minuten vóór het eerste vertrek van de dag                                      |
 | `first_shift_preparation_time`     | Absolute aankomsttijd (HH:MM) vóór het eerste vertrek                                 |
 | `first_shift_preparation_count`    | Hoeveel vroege vertrekken per dag de eerste-dienst-aankomsttijd krijgen (standaard 1) |
-| `last_shift_aftercare`             | Extra minuten ná het laatste vertrek van de dag                                       |
+| `last_shift_aftercare_duration`    | Extra minuten ná het laatste vertrek van de dag                                       |
 | `schedules`                        | Seizoensgebonden roosterlijst (zie hieronder)                                         |
 
 Duurformule: `ritten × ritduur + max(0, ritten − 1) × pauze`

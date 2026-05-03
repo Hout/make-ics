@@ -43,9 +43,8 @@ shift_type:
     trips: 3
     trip_duration: 50
     break_duration: 30
-    preparation_duration: 30
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 50
+    last_shift_aftercare_duration: 50
     schedules:
       - seasons: [laagseizoen]
         slots:
@@ -113,8 +112,7 @@ shift_type:
     description: "Binnendieze; Historische route Voldersgat"
     trips: 2
     trip_duration: 60
-    preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
         slots:
@@ -134,9 +132,8 @@ shift_type:
     description: "Binnendieze; Vestingroute Koninginnesteiger"
     trips: 2
     trip_duration: 105
-    preparation_duration: 30
     first_shift_preparation_duration: 60
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
@@ -148,9 +145,8 @@ shift_type:
     description: "Binnendieze; Jeroen Boschroute Voldersgat"
     trips: 2
     trip_duration: 105
-    preparation_duration: 30
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
@@ -163,7 +159,7 @@ shift_type:
     trips: 1
     trip_duration: 105
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
         slots:
@@ -181,7 +177,7 @@ shift_type:
     trips: 2
     trip_duration: 75
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
@@ -194,7 +190,7 @@ shift_type:
     trips: 1
     trip_duration: 180
     first_shift_preparation_duration: 30
-    last_shift_aftercare: 30
+    last_shift_aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         slots:
