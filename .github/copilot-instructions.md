@@ -1,6 +1,7 @@
 # Copilot Instructions
 
 ## Project Overview
+
 CLI tool (`cmd/make-ics/main.go`) that converts a Dutch xlsx schedule (`report.xlsx`) to an ICS calendar file, driven by `config.yaml`.
 The Python implementation has been archived to `archive/python/` for reference only.
 
@@ -24,17 +25,17 @@ The Python implementation has been archived to `archive/python/` for reference o
 
 ## Package Layout
 
-| Package | Responsibility |
-|---|---|
-| `cmd/make-ics` | CLI entry point (`Run` is testable, `main` just delegates) |
-| `pkg/config` | Load + validate `config.yaml` |
-| `pkg/model` | Shared types (`Config`, `ShiftType`, `DateRange`, …) |
-| `pkg/parser` | Parse Dutch date strings and time strings from xlsx cells |
-| `pkg/range` | `FindDateRange` — date-range resolution with `StartTimeGroup` merging |
-| `pkg/schedule` | Duration / trip helpers and `BuildProgram` description builder |
-| `pkg/pipeline` | `IterEvents` — orchestrates parsing, scheduling, and event assembly |
-| `pkg/ics` | `WriteCalendar` — serialises events to an ICS file |
-| `pkg/i18n` | Thin wrapper around go-i18n v2 |
+| Package        | Responsibility                                                        |
+| -------------- | --------------------------------------------------------------------- |
+| `cmd/make-ics` | CLI entry point (`Run` is testable, `main` just delegates)            |
+| `pkg/config`   | Load + validate `config.yaml`                                         |
+| `pkg/model`    | Shared types (`Config`, `ShiftType`, `DateRange`, …)                  |
+| `pkg/parser`   | Parse Dutch date strings and time strings from xlsx cells             |
+| `pkg/range`    | `FindDateRange` — date-range resolution with `StartTimeGroup` merging |
+| `pkg/schedule` | Duration / trip helpers and `BuildProgram` description builder        |
+| `pkg/pipeline` | `IterEvents` — orchestrates parsing, scheduling, and event assembly   |
+| `pkg/ics`      | `WriteCalendar` — serialises events to an ICS file                    |
+| `pkg/i18n`     | Thin wrapper around go-i18n v2                                        |
 
 ## Project Conventions
 
