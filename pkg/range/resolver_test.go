@@ -78,7 +78,8 @@ func TestFindSchedule_EmptyList(t *testing.T) {
 	}
 }
 
-func TestFindSchedule_StartTimeMismatchReturnsEntry(t *testing.T) {
+func TestFindSchedule_StartTimeMismatch_NoMatch(t *testing.T) {
+	// A slot that declares start_times must not match a departure outside those times.
 	adv := 30
 	groupTrips := 3
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
@@ -89,11 +90,60 @@ func TestFindSchedule_StartTimeMismatchReturnsEntry(t *testing.T) {
 	seasons := testSeasons(from, to)
 
 	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
-	if rr == nil {
-		t.Fatalf("expected slot-level result on startTime mismatch")
+	if rr != nil {
+		t.Fatalf("expected nil when startTime not in slot's start_times, got %+v", rr)
 	}
-	if rr.Trips != nil {
-		t.Fatalf("expected Trips=nil (no group match) got %v", *rr.Trips)
+}
+
+func TestFindSchedule_MultiSlotFallthrough(t *testing.T) {
+	// Two slots for the same weekday (Friday): a daytime slot and an evening slot.
+	// The resolver must skip the daytime slot when the requested time is not listed
+	// there and fall through to the evening slot.
+	from := time.Date(2026, 6, 29, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC)
+	seasons := testSeasons(from, to)
+
+	defaultTrips := 3
+	eveningTrips := 1
+	noMonSlot := model.Slot{
+		Weekdays: []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+		Trips:    &defaultTrips,
+		StartTimes: []model.StartTimeGroup{
+			{Times: []string{"10:00", "14:00"}},
+		},
+	}
+	friSatSlot := model.Slot{
+		Weekdays: []string{"Fri", "Sat"},
+		StartTimes: []model.StartTimeGroup{
+			{Times: []string{"19:00"}, Trips: &eveningTrips},
+		},
+	}
+	sched := testSched(noMonSlot, friSatSlot)
+	apptDate := time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC) // a Friday
+
+	// 10:00 on Friday → noMonSlot, default trips
+	rr := FindSchedule([]model.Schedule{sched}, apptDate, "10:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("10:00: expected noMonSlot match, got nil")
+	}
+	if rr.Trips == nil || *rr.Trips != 3 {
+		t.Fatalf("10:00: expected trips=3 from noMonSlot, got %v", rr.Trips)
+	}
+
+	// 19:00 on Friday → must skip noMonSlot, match friSatSlot with trips=1
+	rr = FindSchedule([]model.Schedule{sched}, apptDate, "19:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("19:00 on Friday: expected friSatSlot match, got nil")
+	}
+	if rr.Trips == nil || *rr.Trips != 1 {
+		t.Fatalf("19:00 on Friday: expected trips=1 from friSatSlot, got %v", rr.Trips)
+	}
+
+	// 19:00 on Wednesday → noMonSlot doesn't list 19:00, friSatSlot weekday doesn't include Wed → nil
+	apptWed := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC) // a Wednesday
+	rr = FindSchedule([]model.Schedule{sched}, apptWed, "19:00", time.Wednesday, seasons)
+	if rr != nil {
+		t.Fatalf("19:00 on Wednesday: expected nil, got %+v", rr)
 	}
 }
 

@@ -16,6 +16,11 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/schedule"
 )
 
+// makeICSNamespace is the UUID v5 namespace for deterministic event UIDs.
+// All events produced by this program share this namespace so the same shift
+// always yields the same UID across runs.
+var makeICSNamespace = uuid.MustParse("4d616b65-4943-5300-0000-000000000001")
+
 // Event holds all fields needed to write a single VEVENT to an ICS calendar.
 type Event struct {
 	Summary     string

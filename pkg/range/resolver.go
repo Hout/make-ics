@@ -157,7 +157,10 @@ func FirstScheduledTimes(schedules []model.Schedule, apptDate time.Time, effecti
 }
 
 // FindSchedule finds the first schedule whose seasons cover apptDate, then the
-// first slot within that schedule whose weekday set contains effectiveWeekday.
+// first slot within that schedule whose weekday set contains effectiveWeekday
+// and whose start_times (if any) contain startTime.
+// A slot with no start_times matches any departure time (wildcard).
+// A slot that declares start_times only matches departures listed in those groups.
 // If a start_time matches a group's Times, the group's fields override the
 // slot-level fields. An empty weekdays list on a slot means all days are allowed.
 // effectiveWeekday is used for weekday matching instead of apptDate.Weekday(),
@@ -187,13 +190,17 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 							if g.BreakDuration != nil {
 								rr.BreakDuration = g.BreakDuration
 							}
-
 							if g.LastAftercare != nil {
 								rr.LastAftercare = g.LastAftercare
 							}
 							return &rr
 						}
 					}
+				}
+				// startTime was not found in any group. A slot that declares
+				// start_times only covers listed departures; skip to the next slot.
+				if len(slot.StartTimes) > 0 {
+					continue
 				}
 			}
 			rr := resolvedFromSlot(slot, slotPath)
