@@ -91,7 +91,6 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 }
 
 // resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
-// resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
 // slotPath is the relative YAML path (e.g. "schedules[0].slots[1]") used for
 // line-number annotation of source fields.
 func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {

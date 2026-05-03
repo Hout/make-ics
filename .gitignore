@@ -1,5 +1,9 @@
 # Go
 /make-ics
+make-ics-macos
+make-ics.exe
+list-shifts-macos
+list-shifts.exe
 coverage.out
 
 # Inputs / outputs
