@@ -19,7 +19,8 @@ func makeRow(code, date, hhmm string) parsedRow {
 
 func TestResolveRows_UnknownCode_DefaultAdvanceAndDuration(t *testing.T) {
 	rows := []parsedRow{makeRow("UNKNOWN", "2026-04-03", "10:00")}
-	resolved, err := resolveRows(rows, 30, nil, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 30, nil, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,8 @@ func TestResolveRows_FirstShiftPreparationDuration(t *testing.T) {
 	adv := 45
 	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationDuration: &adv}}
 	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +55,8 @@ func TestResolveRows_FirstShiftPreparationTime(t *testing.T) {
 	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationTime: &ft}}
 	// departure 10:00; prep time 09:15 → advance = 45 min
 	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +69,8 @@ func TestResolveRows_FirstShiftPreparationTime_AtDeparture_Error(t *testing.T) {
 	ft := "10:00"
 	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationTime: &ft}}
 	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err == nil {
 		t.Fatal("expected error for prep time == departure")
 	}
@@ -79,7 +83,8 @@ func TestResolveRows_LastShiftRemains(t *testing.T) {
 		makeRow("A", "2026-04-03", "10:00"),
 		makeRow("A", "2026-04-03", "12:00"),
 	}
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +111,8 @@ func TestResolveRows_CrossLevelWarningDeduped(t *testing.T) {
 		makeRow("A", "2026-04-04", "10:00"),
 	}
 	warned := make(map[string]bool)
-	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, warned)
+	var warnings []string
+	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, warned, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,6 +122,10 @@ func TestResolveRows_CrossLevelWarningDeduped(t *testing.T) {
 	// warning should only be registered once despite two rows for the same code
 	if len(warned) != 1 {
 		t.Errorf("expected 1 entry in warned map got %d", len(warned))
+	}
+	// the warning message should also appear in the returned warnings slice
+	if len(warnings) != 1 {
+		t.Errorf("expected 1 warning string, got %d: %v", len(warnings), warnings)
 	}
 }
 
@@ -130,7 +140,8 @@ func TestResolveRows_PositionalFallback_NoStartTimes(t *testing.T) {
 		makeRow("A", "2026-04-03", "10:00"), // position 0 → first shift
 		makeRow("A", "2026-04-03", "12:00"), // position 1 → not first
 	}
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +158,8 @@ func TestResolveRows_SummaryAndDescriptionPrefix(t *testing.T) {
 		"A": {Summary: "Alpha Shift", Description: "Route detail"},
 	}
 	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool))
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}

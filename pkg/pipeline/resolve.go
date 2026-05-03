@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/model"
@@ -32,6 +31,7 @@ func resolveRows(
 	exceptions map[string]model.Exception,
 	lines map[string]int,
 	warnedCrossLevel map[string]bool,
+	warnings *[]string,
 ) ([]resolvedRow, error) {
 	lastIdx := make(map[string]int)
 	groupOrder := make(map[string][]int)
@@ -95,8 +95,9 @@ func resolveRows(
 			warnedCrossLevel[p.Code] = true
 			timeInfo := lineForShiftField(p.Code, effectiveFirstPrepTimeSrc, "first_shift_preparation_time", lines)
 			advInfo := lineForShiftField(p.Code, effectiveFirstPrepDurationSrc, "first_shift_preparation_duration", lines)
-			fmt.Fprintf(os.Stderr, "  [WARN] shift %s: first_shift_preparation_time%s and first_shift_preparation_duration%s set at different levels; first_shift_preparation_time prevails\n",
+			msg := fmt.Sprintf("[WARN] shift %s: first_shift_preparation_time%s and first_shift_preparation_duration%s set at different levels; first_shift_preparation_time prevails",
 				p.Code, timeInfo, advInfo)
+			*warnings = append(*warnings, msg)
 		}
 
 		// Determine whether this departure is among the first effectiveCount

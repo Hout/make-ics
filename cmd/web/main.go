@@ -133,7 +133,7 @@ func makeConvertHandler(cfg model.Config, lines config.LineMap) http.HandlerFunc
 		}
 		defer wb.Close()
 
-		events, err := pipeline.IterEvents(
+		events, warnings, err := pipeline.IterEvents(
 			wb,
 			defaultAdvanceMinutes,
 			cfg.Timezone,
@@ -151,6 +151,9 @@ func makeConvertHandler(cfg model.Config, lines config.LineMap) http.HandlerFunc
 
 		icsName := strings.TrimSuffix(header.Filename, filepath.Ext(header.Filename)) + ".ics"
 		w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+		for _, warn := range warnings {
+			w.Header().Add("X-Warning", warn)
+		}
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, icsName))
 		if err := ics.WriteCalendarWriter(w, header.Filename, events); err != nil {
 			// Headers already sent; just log.

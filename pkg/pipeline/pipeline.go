@@ -24,26 +24,30 @@ type Event struct {
 	UID         string
 }
 
-// IterEvents reads the first sheet of the workbook and returns generated events.
+// IterEvents reads the first sheet of the workbook and returns generated events
+// along with any diagnostic warnings produced during parsing and scheduling.
 // It applies scheduling rules from shiftTypes, uses schedule/slot overrides,
 // and produces localized descriptions via the provided Localizer.
 // lines is the LineMap returned by config.LoadConfig and is used to include
 // source line numbers in warnings and errors; it may be nil.
-func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, seasons map[string]model.Season, exceptions map[string]model.Exception, lines map[string]int, loc *i18n.Localizer) ([]Event, error) {
-	parsed, err := parseRows(f)
+// Warnings are never written to os.Stderr; callers decide how to surface them.
+func IterEvents(f *excelize.File, defaultAdvanceMinutes int, timezone string, shiftTypes map[string]model.ShiftType, seasons map[string]model.Season, exceptions map[string]model.Exception, lines map[string]int, loc *i18n.Localizer) ([]Event, []string, error) {
+	var warnings []string
+
+	parsed, err := parseRows(f, &warnings)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	locTZ, err := time.LoadLocation(timezone)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	resolved, err := resolveRows(parsed, defaultAdvanceMinutes, shiftTypes, seasons, exceptions, lines, make(map[string]bool))
+	resolved, err := resolveRows(parsed, defaultAdvanceMinutes, shiftTypes, seasons, exceptions, lines, make(map[string]bool), &warnings)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return buildEvents(resolved, locTZ, loc), nil
+	return buildEvents(resolved, locTZ, loc), warnings, nil
 }

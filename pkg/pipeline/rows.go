@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -18,7 +17,7 @@ type parsedRow struct {
 	Min  int
 }
 
-func parseRows(f *excelize.File) ([]parsedRow, error) {
+func parseRows(f *excelize.File, warnings *[]string) ([]parsedRow, error) {
 	sheet := f.GetSheetName(0)
 	rows, err := f.GetRows(sheet)
 	if err != nil {
@@ -36,12 +35,12 @@ func parseRows(f *excelize.File) ([]parsedRow, error) {
 		}
 		tdate, err := parser.ParseDutchDate(dateStr)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  [SKIP] Could not parse date %q: %v\n", dateStr, err)
+			*warnings = append(*warnings, fmt.Sprintf("[SKIP] Could not parse date %q: %v", dateStr, err))
 			continue
 		}
 		h, m, err := parser.ParseTime(r[2])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "  [SKIP] Could not parse time %q: %v\n", r[2], err)
+			*warnings = append(*warnings, fmt.Sprintf("[SKIP] Could not parse time %q: %v", r[2], err))
 			continue
 		}
 		parsed = append(parsed, parsedRow{Code: code, Date: tdate, Hour: h, Min: m})

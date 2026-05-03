@@ -23,7 +23,8 @@ func TestParseRows_HeaderSkipped(t *testing.T) {
 		{"Datum", "Dienst", "Tijd"},
 		{"03-apr-26", "A", "10:00"},
 	})
-	rows, err := parseRows(f)
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +41,8 @@ func TestParseRows_UnparseableTimeSkipped(t *testing.T) {
 		{"03-apr-26", "A", "geen-tijd"},
 		{"03-apr-26", "B", "10:00"},
 	})
-	rows, err := parseRows(f)
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +59,8 @@ func TestParseRows_UnparseableDateSkipped(t *testing.T) {
 		{"not-a-date", "A", "10:00"},
 		{"03-apr-26", "B", "10:00"},
 	})
-	rows, err := parseRows(f)
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +71,8 @@ func TestParseRows_UnparseableDateSkipped(t *testing.T) {
 
 func TestParseRows_CodeTrimsWhitespace(t *testing.T) {
 	f := newSheet([][]string{{"03-apr-26", "  HRm_  ", "10:00"}})
-	rows, err := parseRows(f)
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +86,8 @@ func TestParseRows_CodeTrimsWhitespace(t *testing.T) {
 
 func TestParseRows_AfspraakFallback(t *testing.T) {
 	f := newSheet([][]string{{"03-apr-26", "", "10:00"}})
-	rows, err := parseRows(f)
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,5 +96,26 @@ func TestParseRows_AfspraakFallback(t *testing.T) {
 	}
 	if rows[0].Code != "Afspraak" {
 		t.Fatalf("expected Afspraak got %q", rows[0].Code)
+	}
+}
+
+func TestParseRows_SkipWarningsCollected(t *testing.T) {
+	// A row with a bad time produces a warning string collected into the slice,
+	// not written to stderr. (Rows that don't match IsDataRow are silently filtered
+	// before parsing and produce no warning.)
+	f := newSheet([][]string{
+		{"03-apr-26", "A", "geen-tijd"}, // bad time → warning
+		{"03-apr-26", "B", "10:00"},     // good row
+	})
+	var warnings []string
+	rows, err := parseRows(f, &warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 good row, got %d", len(rows))
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
 	}
 }

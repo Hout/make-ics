@@ -62,9 +62,12 @@ func Run(args []string) error {
 	}
 	defer wb.Close()
 
-	events, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, cfg.Seasons, cfg.Exceptions, lines, loc)
+	events, warnings, err := pipeline.IterEvents(wb, defaultAdvanceMinutes, cfg.Timezone, cfg.ShiftType, cfg.Seasons, cfg.Exceptions, lines, loc)
 	if err != nil {
 		return fmt.Errorf("failed to build events: %w", err)
+	}
+	for _, w := range warnings {
+		fmt.Fprintf(os.Stderr, "  %s\n", w)
 	}
 
 	icsPath := (*input)[:len(*input)-len(filepath.Ext(*input))] + ".ics"
