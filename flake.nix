@@ -12,7 +12,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in {
         devShells.default = pkgs.mkShell {
-          packages = [ pkgs.go_1_25 pkgs.pre-commit pkgs.prettier pkgs.yq ];
+          packages = [ pkgs.go_1_25 pkgs.pre-commit pkgs.prettier pkgs.yq pkgs.git-cliff ];
         };
       });
 }
