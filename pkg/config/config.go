@@ -11,23 +11,12 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
-// IsEmpty reports whether cfg is a zero-value Config (no timezone set).
-// It is used to detect when no config file was found so the caller can
-// fall back to a compiled-in default.
-func IsEmpty(cfg model.Config) bool {
-	return cfg.Timezone == "" && cfg.Locale == "" && len(cfg.ShiftType) == 0
-}
-
 // LoadConfig reads and unmarshals the YAML file at path into a Config.
-// A missing file is not an error — it returns a zero-value Config.
 // It also returns a LineMap for use in error messages.
 func LoadConfig(path string) (model.Config, LineMap, error) {
 	var cfg model.Config
 	f, err := os.Open(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return cfg, nil, nil
-		}
 		return cfg, nil, err
 	}
 	defer f.Close()

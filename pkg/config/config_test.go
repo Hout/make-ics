@@ -11,12 +11,9 @@ import (
 
 func TestLoadConfig_MissingFile(t *testing.T) {
 	tmp := t.TempDir()
-	cfg, _, err := LoadConfig(filepath.Join(tmp, "nope.yaml"))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(cfg.ShiftType) != 0 || cfg.Timezone != "" {
-		t.Fatalf("expected empty config for missing file")
+	_, _, err := LoadConfig(filepath.Join(tmp, "nope.yaml"))
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
 	}
 }
 

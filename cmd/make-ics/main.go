@@ -8,7 +8,6 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
-	"github.com/jeroen/make-ics-go/internal/defaultcfg"
 	"github.com/jeroen/make-ics-go/pkg/config"
 	"github.com/jeroen/make-ics-go/pkg/i18n"
 	"github.com/jeroen/make-ics-go/pkg/ics"
@@ -41,16 +40,9 @@ func Run(args []string) error {
 		*input = fs.Arg(0)
 	}
 
-	// load config: try external file, fall back to embedded default
 	cfg, lines, err := config.LoadConfig(*cfgPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-	if config.IsEmpty(cfg) {
-		cfg, lines, err = config.LoadConfigFromBytes(defaultcfg.DefaultConfig)
-		if err != nil {
-			return fmt.Errorf("failed to load embedded config: %w", err)
-		}
 	}
 	if err := config.ValidateConfig(cfg, *cfgPath, lines); err != nil {
 		return err

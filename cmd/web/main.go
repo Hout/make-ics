@@ -19,7 +19,6 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
-	"github.com/jeroen/make-ics-go/internal/defaultcfg"
 	"github.com/jeroen/make-ics-go/pkg/config"
 	"github.com/jeroen/make-ics-go/pkg/i18n"
 	"github.com/jeroen/make-ics-go/pkg/ics"
@@ -37,7 +36,7 @@ const (
 
 func main() {
 	port := flag.String("port", "8080", "TCP port to listen on")
-	cfgPath := flag.String("config", "", "Optional path to a config.yaml override (uses built-in default if empty)")
+	cfgPath := flag.String("config", "config.yaml", "Path to YAML config file")
 	flag.Parse()
 
 	cfg, lines, err := loadConfig(*cfgPath)
@@ -76,22 +75,9 @@ func main() {
 }
 
 func loadConfig(path string) (model.Config, config.LineMap, error) {
-	var (
-		cfg   model.Config
-		lines config.LineMap
-		err   error
-	)
-	if path != "" {
-		cfg, lines, err = config.LoadConfig(path)
-		if err != nil {
-			return cfg, nil, fmt.Errorf("loading %q: %w", path, err)
-		}
-	}
-	if config.IsEmpty(cfg) {
-		cfg, lines, err = config.LoadConfigFromBytes(defaultcfg.DefaultConfig)
-		if err != nil {
-			return cfg, nil, fmt.Errorf("loading embedded config: %w", err)
-		}
+	cfg, lines, err := config.LoadConfig(path)
+	if err != nil {
+		return cfg, nil, fmt.Errorf("loading %q: %w", path, err)
 	}
 	if err := config.ValidateConfig(cfg, path, lines); err != nil {
 		return cfg, nil, err
