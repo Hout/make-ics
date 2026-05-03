@@ -8,7 +8,7 @@
 # Caddy provisions and renews TLS certificates automatically via Let's Encrypt.
 # Replace example.com with your actual domain, or use ":80" for plain HTTP.
 
-example.com {
+houtzager.org {
     # Allow xlsx uploads up to 10 MB (matches the Go server's MaxBytesReader).
     request_body {
         max_size 10MB
