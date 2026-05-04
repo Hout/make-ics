@@ -13,12 +13,11 @@ const defaultAppointmentMinutes = 240 // 4 h fallback when no trip data is confi
 
 type resolvedRow struct {
 	parsed          parsedRow
-	advance         int  // minutes before departure
-	durationMinutes int  // total duration including aftercare
-	remains         int  // aftercare minutes (also included in durationMinutes; needed by BuildProgram)
+	advance         int // minutes before departure
+	durationMinutes int // total duration
+	remains         int // aftercare minutes after last trip end (used by BuildProgramFromTripTimes)
+	tripTimes       []model.TripTime
 	trips           *int // nil when not configured
-	tripDurVal      *int // nil when not configured
-	breakDurVal     int
 	summary         string
 	description     string // shift.Description prefix (may be empty)
 }
@@ -33,191 +32,77 @@ func resolveRows(
 	warnedCrossLevel map[string]bool,
 	warnings *[]string,
 ) ([]resolvedRow, error) {
-	lastIdx := make(map[string]int)
-	groupOrder := make(map[string][]int)
-	for i, p := range parsed {
-		key := fmt.Sprintf("%s|%s", p.Code, p.Date.Format("2006-01-02"))
-		lastIdx[key] = i
-		groupOrder[key] = append(groupOrder[key], i)
-	}
-	positionOf := make(map[int]int, len(parsed))
-	for _, indices := range groupOrder {
-		for pos, idx := range indices {
-			positionOf[idx] = pos
-		}
-	}
-
 	resolved := make([]resolvedRow, 0, len(parsed))
-	for i, p := range parsed {
-		key := fmt.Sprintf("%s|%s", p.Code, p.Date.Format("2006-01-02"))
-		isLast := lastIdx[key] == i
-
-		// resolve shift type; unknown codes use a zero-value ShiftType (all pointer
-		// fields nil), which causes all helpers to return their safe defaults.
+	for _, p := range parsed {
 		shift, hasShift := shiftTypes[p.Code]
 		startTime := fmt.Sprintf("%02d:%02d", p.Hour, p.Min)
 		eff := dr.EffectiveWeekday(p.Date, exceptions)
 		rangeEntry := dr.FindSchedule(shift.Schedules, p.Date, startTime, eff, seasons)
 
-		// resolve effective first-shift count (how many leading shifts get the advance)
-		effectiveCount := 1
-		if rangeEntry != nil && rangeEntry.FirstShiftPreparationCount != nil {
-			effectiveCount = *rangeEntry.FirstShiftPreparationCount
-		} else if hasShift && shift.FirstShiftPreparationCount != nil {
-			effectiveCount = *shift.FirstShiftPreparationCount
-		}
+		tripTimes := rangeEntryTripTimes(rangeEntry)
+		departureMinutes := p.Hour*60 + p.Min
 
-		// resolve first_shift_preparation_time and first_shift_preparation_duration independently
-		// so cross-level conflicts (one from range, other from shift) can be detected.
-		var effectiveFirstPrepTime *string
-		var effectiveFirstPrepTimeSrc string
-		var effectiveFirstPrepDuration *int
-		var effectiveFirstPrepDurationSrc string
-		if rangeEntry != nil {
-			if rangeEntry.FirstShiftPreparationTime != nil {
-				effectiveFirstPrepTime = rangeEntry.FirstShiftPreparationTime
-				effectiveFirstPrepTimeSrc = rangeEntry.FirstShiftPreparationTimeSrc
+		// Compute arrive time
+		var arriveMinutes int
+		if rangeEntry != nil && rangeEntry.Arrive != nil {
+			at, err := time.Parse("15:04", *rangeEntry.Arrive)
+			if err != nil {
+				return nil, fmt.Errorf("shift %s on %s: invalid arrive time %q: %v", p.Code, p.Date.Format("2006-01-02"), *rangeEntry.Arrive, err)
 			}
-			if rangeEntry.FirstShiftPreparationDuration != nil {
-				effectiveFirstPrepDuration = rangeEntry.FirstShiftPreparationDuration
-				effectiveFirstPrepDurationSrc = rangeEntry.FirstShiftPreparationDurationSrc
+			arriveMinutes = at.Hour()*60 + at.Minute()
+			if arriveMinutes >= departureMinutes {
+				return nil, fmt.Errorf("shift %s on %s: arrive time %q is at or after departure %02d:%02d", p.Code, p.Date.Format("2006-01-02"), *rangeEntry.Arrive, p.Hour, p.Min)
 			}
-		}
-		if effectiveFirstPrepTime == nil && hasShift && shift.FirstShiftPreparationTime != nil {
-			effectiveFirstPrepTime = shift.FirstShiftPreparationTime
-			effectiveFirstPrepTimeSrc = "" // ShiftType level
-		}
-		if effectiveFirstPrepDuration == nil && hasShift && shift.FirstShiftPreparationDuration != nil {
-			effectiveFirstPrepDuration = shift.FirstShiftPreparationDuration
-			effectiveFirstPrepDurationSrc = "" // ShiftType level
-		}
-		if effectiveFirstPrepTime != nil && effectiveFirstPrepDuration != nil && !warnedCrossLevel[p.Code] {
-			warnedCrossLevel[p.Code] = true
-			timeInfo := lineForShiftField(p.Code, effectiveFirstPrepTimeSrc, "first_shift_preparation_time", lines)
-			advInfo := lineForShiftField(p.Code, effectiveFirstPrepDurationSrc, "first_shift_preparation_duration", lines)
-			msg := fmt.Sprintf("[WARN] shift %s: first_shift_preparation_time%s and first_shift_preparation_duration%s set at different levels; first_shift_preparation_time prevails",
-				p.Code, timeInfo, advInfo)
-			*warnings = append(*warnings, msg)
-		}
-
-		// Determine whether this departure is among the first effectiveCount
-		// scheduled times for this slot. FirstScheduledTimes looks up the slot from
-		// config and returns the chronologically earliest N times; if no start_times
-		// are defined we fall back to positional order within the xlsx rows.
-		firstTimes := dr.FirstScheduledTimes(shift.Schedules, p.Date, eff, seasons, effectiveCount)
-		var isFirstShift bool
-		if firstTimes != nil {
-			isFirstShift = firstTimes[startTime]
 		} else {
-			isFirstShift = positionOf[i] < effectiveCount
+			arriveMinutes = departureMinutes - defaultAdvanceMinutes
 		}
+		advance := departureMinutes - arriveMinutes
 
-		var advance int
-		generalPreparation := schedule.GetPreparationDuration(shift, rangeEntry)
-		if isFirstShift {
-			switch {
-			case effectiveFirstPrepTime != nil:
-				ft, err := time.Parse("15:04", *effectiveFirstPrepTime)
-				if err != nil {
-					return nil, fmt.Errorf("shift %s: invalid first_shift_preparation_time %q: %v", p.Code, *effectiveFirstPrepTime, err)
-				}
-				firstTimeMinutes := ft.Hour()*60 + ft.Minute()
-				departureMinutes := p.Hour*60 + p.Min
-				if firstTimeMinutes >= departureMinutes {
-					lineInfo := lineForShiftField(p.Code, effectiveFirstPrepTimeSrc, "first_shift_preparation_time", lines)
-					return nil, fmt.Errorf("shift %s on %s: first_shift_preparation_time %q%s is at or after departure %02d:%02d",
-						p.Code, p.Date.Format("2006-01-02"), *effectiveFirstPrepTime, lineInfo, p.Hour, p.Min)
-				}
-				advance = departureMinutes - firstTimeMinutes
-			case effectiveFirstPrepDuration != nil:
-				advance = *effectiveFirstPrepDuration
-			case generalPreparation != nil:
-				advance = *generalPreparation
-			default:
-				advance = defaultAdvanceMinutes
+		// Compute leave time
+		var leaveMinutes int
+		if rangeEntry != nil && rangeEntry.Leave != nil {
+			lt, err := time.Parse("15:04", *rangeEntry.Leave)
+			if err != nil {
+				return nil, fmt.Errorf("shift %s on %s: invalid leave time %q: %v", p.Code, p.Date.Format("2006-01-02"), *rangeEntry.Leave, err)
 			}
-		} else if generalPreparation != nil {
-			advance = *generalPreparation
+			leaveMinutes = lt.Hour()*60 + lt.Minute()
+		} else if len(tripTimes) > 0 {
+			if len(tripTimes) == 1 {
+				return nil, fmt.Errorf("shift %s on %s: single-trip shift requires explicit leave time", p.Code, p.Date.Format("2006-01-02"))
+			}
+			// Multi-trip without explicit leave: use last trip end
+			lastTrip := tripTimes[len(tripTimes)-1]
+			lt, err := time.Parse("15:04", lastTrip.Start)
+			if err != nil {
+				return nil, fmt.Errorf("shift %s: invalid last trip start %q: %v", p.Code, lastTrip.Start, err)
+			}
+			if lastTrip.Duration <= 0 {
+				return nil, fmt.Errorf("shift %s on %s: last trip has no duration, cannot auto-compute leave", p.Code, p.Date.Format("2006-01-02"))
+			}
+			leaveMinutes = lt.Hour()*60 + lt.Minute() + lastTrip.Duration
 		} else {
-			advance = defaultAdvanceMinutes
+			leaveMinutes = departureMinutes + defaultAppointmentMinutes
+		}
+		durationMinutes := leaveMinutes - departureMinutes
+
+		// Compute remains: aftercare minutes after last trip end (for description)
+		var remains int
+		if len(tripTimes) > 0 {
+			lastTrip := tripTimes[len(tripTimes)-1]
+			lt, err := time.Parse("15:04", lastTrip.Start)
+			if err == nil {
+				lastTripEndMinutes := lt.Hour()*60 + lt.Minute()
+				if lastTrip.Duration > 0 {
+					lastTripEndMinutes += lastTrip.Duration
+				}
+				remains = leaveMinutes - lastTripEndMinutes
+				if remains < 0 {
+					remains = 0
+				}
+			}
 		}
 
 		trips := schedule.GetTrips(shift, rangeEntry)
-		baseDurationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultAppointmentMinutes)
-		generalAftercare := 0
-		if aftercare := schedule.GetAftercareDuration(shift, rangeEntry); aftercare != nil {
-			generalAftercare = *aftercare
-		}
-
-		var effectiveLastAftercareTime *string
-		var effectiveLastAftercareTimeSrc string
-		var effectiveLastAftercareDuration *int
-		var effectiveLastAftercareDurationSrc string
-		if rangeEntry != nil {
-			if rangeEntry.LastShiftAftercareTime != nil {
-				effectiveLastAftercareTime = rangeEntry.LastShiftAftercareTime
-				effectiveLastAftercareTimeSrc = rangeEntry.LastShiftAftercareTimeSrc
-			}
-			if rangeEntry.LastShiftAftercareDuration != nil {
-				effectiveLastAftercareDuration = rangeEntry.LastShiftAftercareDuration
-				effectiveLastAftercareDurationSrc = rangeEntry.LastShiftAftercareDurationSrc
-			}
-		}
-		if effectiveLastAftercareTime == nil && hasShift && shift.LastShiftAftercareTime != nil {
-			effectiveLastAftercareTime = shift.LastShiftAftercareTime
-			effectiveLastAftercareTimeSrc = ""
-		}
-		if effectiveLastAftercareDuration == nil {
-			if lastAftercare := schedule.GetLastShiftAftercareDuration(shift, rangeEntry); lastAftercare != nil {
-				effectiveLastAftercareDuration = lastAftercare
-				if rangeEntry != nil && rangeEntry.LastShiftAftercareDuration == lastAftercare {
-					effectiveLastAftercareDurationSrc = rangeEntry.LastShiftAftercareDurationSrc
-				}
-			}
-		}
-		if effectiveLastAftercareTime != nil && effectiveLastAftercareDuration != nil && !warnedCrossLevel["last:"+p.Code] {
-			warnedCrossLevel["last:"+p.Code] = true
-			timeInfo := lineForShiftField(p.Code, effectiveLastAftercareTimeSrc, "last_shift_aftercare_time", lines)
-			advInfo := lineForShiftField(p.Code, effectiveLastAftercareDurationSrc, "last_shift_aftercare_duration", lines)
-			msg := fmt.Sprintf("[WARN] shift %s: last_shift_aftercare_time%s and last_shift_aftercare_duration%s set at different levels; last_shift_aftercare_time prevails",
-				p.Code, timeInfo, advInfo)
-			*warnings = append(*warnings, msg)
-		}
-
-		remains := generalAftercare
-		if isLast {
-			switch {
-			case effectiveLastAftercareTime != nil:
-				lt, err := time.Parse("15:04", *effectiveLastAftercareTime)
-				if err != nil {
-					return nil, fmt.Errorf("shift %s: invalid last_shift_aftercare_time %q: %v", p.Code, *effectiveLastAftercareTime, err)
-				}
-				lastTimeMinutes := lt.Hour()*60 + lt.Minute()
-				departureMinutes := p.Hour*60 + p.Min
-				remains = lastTimeMinutes - departureMinutes - baseDurationMinutes
-				if remains < 0 {
-					lineInfo := lineForShiftField(p.Code, effectiveLastAftercareTimeSrc, "last_shift_aftercare_time", lines)
-					return nil, fmt.Errorf("shift %s on %s: last_shift_aftercare_time %q%s is before the computed end of the last shift",
-						p.Code, p.Date.Format("2006-01-02"), *effectiveLastAftercareTime, lineInfo)
-				}
-			case effectiveLastAftercareDuration != nil:
-				remains = *effectiveLastAftercareDuration
-			}
-		}
-		durationMinutes := baseDurationMinutes + remains
-
-		var tripDurVal *int
-		var breakDurVal int
-		if rangeEntry != nil && rangeEntry.TripDuration != nil {
-			tripDurVal = rangeEntry.TripDuration
-		} else if shift.TripDuration != nil {
-			tripDurVal = shift.TripDuration
-		}
-		if rangeEntry != nil && rangeEntry.BreakDuration != nil {
-			breakDurVal = *rangeEntry.BreakDuration
-		} else if shift.BreakDuration != nil {
-			breakDurVal = *shift.BreakDuration
-		}
 
 		summary := p.Code
 		if hasShift && shift.Summary != "" {
@@ -233,9 +118,8 @@ func resolveRows(
 			advance:         advance,
 			durationMinutes: durationMinutes,
 			remains:         remains,
+			tripTimes:       tripTimes,
 			trips:           trips,
-			tripDurVal:      tripDurVal,
-			breakDurVal:     breakDurVal,
 			summary:         summary,
 			description:     descriptionPrefix,
 		})
@@ -243,9 +127,18 @@ func resolveRows(
 	return resolved, nil
 }
 
+func rangeEntryTripTimes(rangeEntry *dr.ResolvedRange) []model.TripTime {
+	if rangeEntry == nil || len(rangeEntry.TripTimes) == 0 {
+		return nil
+	}
+	out := make([]model.TripTime, len(rangeEntry.TripTimes))
+	copy(out, rangeEntry.TripTimes)
+	return out
+}
+
 // lineForShiftField returns " (line N)" when lines contains the YAML path for
 // field within the given shift code and source path, otherwise returns "".
-// srcPath is the relative path within the ShiftType (e.g. "schedules[0].day_schedules[1]");
+// srcPath is the relative path within the ShiftType (e.g. "season_schedules[0].day_schedules[1]");
 // an empty srcPath means the field is at ShiftType level.
 func lineForShiftField(code, srcPath, field string, lines map[string]int) string {
 	if lines == nil {

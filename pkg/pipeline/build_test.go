@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/i18n"
+	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
-func makeResolved(advance, durationMinutes int, trips, tripDurVal *int, breakDurVal, remains int) resolvedRow {
+func makeResolved(advance, durationMinutes int, trips *int, remains int) resolvedRow {
 	d := time.Date(2026, 4, 3, 0, 0, 0, 0, time.UTC)
 	return resolvedRow{
 		parsed:          parsedRow{Code: "A", Date: d, Hour: 10, Min: 0},
@@ -16,8 +17,6 @@ func makeResolved(advance, durationMinutes int, trips, tripDurVal *int, breakDur
 		durationMinutes: durationMinutes,
 		remains:         remains,
 		trips:           trips,
-		tripDurVal:      tripDurVal,
-		breakDurVal:     breakDurVal,
 		summary:         "A",
 	}
 }
@@ -30,7 +29,7 @@ func mustLocalizer(lang string) *i18n.Localizer {
 func TestBuildEvents_DtStartDtEnd(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	r := makeResolved(30, 120, nil, nil, 0, 0)
+	r := makeResolved(30, 120, nil, 0)
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
 	if len(events) != 1 {
@@ -51,7 +50,7 @@ func TestBuildEvents_DtStartDtEnd(t *testing.T) {
 func TestBuildEvents_SummaryFromResolved(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	r := makeResolved(10, 60, nil, nil, 0, 0)
+	r := makeResolved(10, 60, nil, 0)
 	r.summary = "My Shift"
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
@@ -63,7 +62,7 @@ func TestBuildEvents_SummaryFromResolved(t *testing.T) {
 func TestBuildEvents_DescriptionPrefixIncluded(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	r := makeResolved(10, 60, nil, nil, 0, 0)
+	r := makeResolved(10, 60, nil, 0)
 	r.description = "Route detail\n"
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
@@ -75,7 +74,7 @@ func TestBuildEvents_DescriptionPrefixIncluded(t *testing.T) {
 func TestBuildEvents_NilTrips_SimpleFormat(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	r := makeResolved(30, 240, nil, nil, 0, 0)
+	r := makeResolved(30, 240, nil, 0)
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
 	desc := events[0].Description
@@ -84,26 +83,11 @@ func TestBuildEvents_NilTrips_SimpleFormat(t *testing.T) {
 	}
 }
 
-func TestBuildEvents_WithTripsAndTripDur_BuildProgram(t *testing.T) {
-	loc := mustLocalizer("en")
-	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	trips := 2
-	tripDur := 50
-	r := makeResolved(30, 130, &trips, &tripDur, 10, 0)
-
-	events := buildEvents([]resolvedRow{r}, tz, loc)
-	desc := events[0].Description
-	// BuildProgram includes "Trip" lines
-	if !bytes.Contains([]byte(desc), []byte("Trip")) {
-		t.Errorf("expected BuildProgram output in description, got %q", desc)
-	}
-}
-
 func TestBuildEvents_TripsNoTripDur_FallbackFormat(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
 	trips := 3
-	r := makeResolved(30, 240, &trips, nil, 0, 0)
+	r := makeResolved(30, 240, &trips, 0)
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
 	desc := events[0].Description
@@ -116,10 +100,26 @@ func TestBuildEvents_TripsNoTripDur_FallbackFormat(t *testing.T) {
 func TestBuildEvents_TimezoneApplied(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")
-	r := makeResolved(10, 60, nil, nil, 0, 0)
+	r := makeResolved(10, 60, nil, 0)
 
 	events := buildEvents([]resolvedRow{r}, tz, loc)
 	if events[0].DtStart.Location() != tz {
 		t.Errorf("DtStart timezone want %v got %v", tz, events[0].DtStart.Location())
+	}
+}
+
+func TestBuildEvents_WithExplicitTripTimes(t *testing.T) {
+	loc := mustLocalizer("en")
+	tz, _ := time.LoadLocation("Europe/Amsterdam")
+	r := makeResolved(30, 210, nil, 0)
+	r.tripTimes = []model.TripTime{
+		{Start: "10:20", Duration: 50},
+		{Start: "11:40", Duration: 50},
+	}
+
+	events := buildEvents([]resolvedRow{r}, tz, loc)
+	desc := events[0].Description
+	if !bytes.Contains([]byte(desc), []byte("Trip 1")) {
+		t.Errorf("expected explicit trip schedule in description, got %q", desc)
 	}
 }

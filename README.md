@@ -54,7 +54,7 @@ shift_type:
     trip_duration: 60
     preparation_duration: 30
     aftercare_duration: 30
-    schedules:
+    season_schedules:
       - seasons: [laagseizoen]
         day_schedules:
           - weekdays: ["Sat", "Sun"]
@@ -99,10 +99,10 @@ When both `last_shift_aftercare_time` and `last_shift_aftercare_duration` are se
 
 ### Schedules, day schedules and start times
 
-Each entry under `schedules` applies when the shift date falls within one of its `seasons`. Inside a schedule, `day_schedules` narrow by weekday:
+Each entry under `season_schedules` applies when the shift date falls within one of its `seasons`. Inside a schedule, `day_schedules` narrow by weekday:
 
 ```yaml
-schedules:
+season_schedules:
   - seasons: [laagseizoen]
     day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]

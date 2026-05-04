@@ -3,46 +3,39 @@ package drange
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
 
-// ResolvedRange represents the merged result of a Schedule Slot and an optional
-// StartTimeGroup override. Fields are pointers to distinguish missing values.
-// The Src fields record the relative YAML path (within the ShiftType) of the
-// struct that contributed that field, for line-number annotations in warnings
-// and errors. An empty string means ShiftType level.
+// ResolvedRange represents the merged result of a Schedule Slot (and optional
+// per-shift override). Fields are pointers to distinguish missing values.
 type ResolvedRange struct {
-	PreparationDuration              *int
-	Trips                            *int
-	TripDuration                     *int
-	BreakDuration                    *int
-	FirstShiftPreparationDuration    *int
-	FirstShiftPreparationTime        *string
-	FirstShiftPreparationCount       *int
-	AftercareDuration                *int
-	LastShiftAftercareDuration       *int
-	LastShiftAftercareTime           *string
-	FirstShiftPreparationDurationSrc string // relative path of struct that set FirstShiftPreparationDuration
-	FirstShiftPreparationTimeSrc     string // relative path of struct that set FirstShiftPreparationTime
-	LastShiftAftercareDurationSrc    string // relative path of struct that set LastShiftAftercareDuration
-	LastShiftAftercareTimeSrc        string // relative path of struct that set LastShiftAftercareTime
+	TripTimes []model.TripTime
+	Trips     *int
+	Arrive    *string // explicit arrive time from the matched Shift, if set
+	Leave     *string // explicit leave time from the matched Shift, if set
 }
 
-func effectiveSlotLastAftercareDuration(slot model.Slot) *int {
-	if slot.LastShiftAftercareDuration != nil {
-		return slot.LastShiftAftercareDuration
+func sortedShiftKeys(shifts map[string]model.Shift) []string {
+	keys := make([]string, 0, len(shifts))
+	for k := range shifts {
+		keys = append(keys, k)
 	}
-	return slot.LastAftercare
-}
-
-func effectiveGroupLastAftercareDuration(group model.StartTimeGroup) *int {
-	if group.LastShiftAftercareDuration != nil {
-		return group.LastShiftAftercareDuration
-	}
-	return group.LastAftercare
+	sort.Slice(keys, func(i, j int) bool {
+		ii, errI := strconv.Atoi(keys[i])
+		jj, errJ := strconv.Atoi(keys[j])
+		if errI != nil || errJ != nil {
+			return keys[i] < keys[j]
+		}
+		if ii == jj {
+			return keys[i] < keys[j]
+		}
+		return ii < jj
+	})
+	return keys
 }
 
 // containsWeekday reports whether the abbreviation of wd (e.g. "Tue") is present
@@ -109,36 +102,9 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 	return false
 }
 
-// resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
-// slotPath is the relative YAML path (e.g. "schedules[0].day_schedules[1]") used for
-// line-number annotation of source fields.
-func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
-	lastAftercareDuration := effectiveSlotLastAftercareDuration(slot)
-	rr := ResolvedRange{
-		PreparationDuration:           slot.PreparationDuration,
-		Trips:                         slot.Trips,
-		TripDuration:                  slot.TripDuration,
-		BreakDuration:                 slot.BreakDuration,
-		FirstShiftPreparationDuration: slot.FirstShiftPreparationDuration,
-		FirstShiftPreparationTime:     slot.FirstShiftPreparationTime,
-		FirstShiftPreparationCount:    slot.FirstShiftPreparationCount,
-		AftercareDuration:             slot.AftercareDuration,
-		LastShiftAftercareDuration:    lastAftercareDuration,
-		LastShiftAftercareTime:        slot.LastShiftAftercareTime,
-	}
-	if slot.FirstShiftPreparationDuration != nil {
-		rr.FirstShiftPreparationDurationSrc = slotPath
-	}
-	if slot.FirstShiftPreparationTime != nil {
-		rr.FirstShiftPreparationTimeSrc = slotPath
-	}
-	if lastAftercareDuration != nil {
-		rr.LastShiftAftercareDurationSrc = slotPath
-	}
-	if slot.LastShiftAftercareTime != nil {
-		rr.LastShiftAftercareTimeSrc = slotPath
-	}
-	return rr
+// resolvedFromSlot builds a ResolvedRange from the slot-level fields.
+func resolvedFromSlot(slot model.Slot) ResolvedRange {
+	return ResolvedRange{Trips: slot.Trips}
 }
 
 // FirstScheduledTimes returns the set of the chronologically first count
@@ -155,15 +121,29 @@ func FirstScheduledTimes(schedules []model.Schedule, apptDate time.Time, effecti
 			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
 				continue
 			}
-			if len(slot.StartTimes) == 0 {
+			if len(slot.Shifts) == 0 && len(slot.StartTimes) == 0 {
 				return nil
 			}
 			var mins []int
-			for _, g := range slot.StartTimes {
-				for _, tm := range g.Times {
-					t, _ := time.Parse("15:04", strings.TrimSpace(tm))
+			if len(slot.Shifts) > 0 {
+				for _, shiftKey := range sortedShiftKeys(slot.Shifts) {
+					shift := slot.Shifts[shiftKey]
+					if len(shift.TripTimes) == 0 {
+						continue
+					}
+					t, _ := time.Parse("15:04", strings.TrimSpace(shift.TripTimes[0].Start))
 					mins = append(mins, t.Hour()*60+t.Minute())
 				}
+			} else {
+				for _, g := range slot.StartTimes {
+					for _, tm := range g.Times {
+						t, _ := time.Parse("15:04", strings.TrimSpace(tm))
+						mins = append(mins, t.Hour()*60+t.Minute())
+					}
+				}
+			}
+			if len(mins) == 0 {
+				return nil
 			}
 			sort.Ints(mins)
 			if count > len(mins) {
@@ -190,51 +170,52 @@ func FirstScheduledTimes(schedules []model.Schedule, apptDate time.Time, effecti
 // allowing exception dates to be treated as a different day of the week.
 // Returns nil when no schedule/slot matches.
 func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime string, effectiveWeekday time.Weekday, seasons map[string]model.Season) *ResolvedRange {
-	for si, sched := range schedules {
+	for _, sched := range schedules {
 		if !dateInSchedule(apptDate, sched, seasons) {
 			continue
 		}
-		for sli, slot := range sched.Slots {
+		for _, slot := range sched.Slots {
 			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
 				continue
 			}
-			slotPath := fmt.Sprintf("schedules[%d].day_schedules[%d]", si, sli)
 			if startTime != "" {
-				for gi, g := range slot.StartTimes {
-					for _, tm := range g.Times {
-						if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
-							rr := resolvedFromSlot(slot, slotPath)
-							groupPath := fmt.Sprintf("%s.start_times[%d]", slotPath, gi)
-							if g.Trips != nil {
-								rr.Trips = g.Trips
+				if len(slot.Shifts) > 0 {
+					for _, shiftKey := range sortedShiftKeys(slot.Shifts) {
+						shift := slot.Shifts[shiftKey]
+						if len(shift.TripTimes) == 0 {
+							continue
+						}
+						if strings.TrimSpace(shift.TripTimes[0].Start) != strings.TrimSpace(startTime) {
+							continue
+						}
+						rr := resolvedFromSlot(slot)
+						rr.TripTimes = shift.TripTimes
+						tripCount := len(shift.TripTimes)
+						rr.Trips = &tripCount
+						rr.Arrive = shift.Arrive
+						rr.Leave = shift.Leave
+						return &rr
+					}
+				} else {
+					for _, g := range slot.StartTimes {
+						for _, tm := range g.Times {
+							if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
+								rr := resolvedFromSlot(slot)
+								if g.Trips != nil {
+									rr.Trips = g.Trips
+								}
+								return &rr
 							}
-							if g.TripDuration != nil {
-								rr.TripDuration = g.TripDuration
-							}
-							if g.BreakDuration != nil {
-								rr.BreakDuration = g.BreakDuration
-							}
-							if g.PreparationDuration != nil {
-								rr.PreparationDuration = g.PreparationDuration
-							}
-							if g.AftercareDuration != nil {
-								rr.AftercareDuration = g.AftercareDuration
-							}
-							if lastAftercareDuration := effectiveGroupLastAftercareDuration(g); lastAftercareDuration != nil {
-								rr.LastShiftAftercareDuration = lastAftercareDuration
-								rr.LastShiftAftercareDurationSrc = groupPath
-							}
-							return &rr
 						}
 					}
 				}
 				// startTime was not found in any group. A slot that declares
-				// start_times only covers listed departures; skip to the next slot.
-				if len(slot.StartTimes) > 0 {
+				// shifts/start_times only covers listed departures; skip to the next slot.
+				if len(slot.Shifts) > 0 || len(slot.StartTimes) > 0 {
 					continue
 				}
 			}
-			rr := resolvedFromSlot(slot, slotPath)
+			rr := resolvedFromSlot(slot)
 			return &rr
 		}
 	}

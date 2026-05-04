@@ -21,8 +21,7 @@ func TestFindSchedule_GroupOverride(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	trips := 3
-	tripDur := 40
-	grp := model.StartTimeGroup{Times: []string{"10:00"}, Trips: &trips, TripDuration: &tripDur}
+	grp := model.StartTimeGroup{Times: []string{"10:00"}, Trips: &trips}
 	slot := model.Slot{StartTimes: []model.StartTimeGroup{grp}}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
@@ -34,9 +33,6 @@ func TestFindSchedule_GroupOverride(t *testing.T) {
 	}
 	if rr.Trips == nil || *rr.Trips != 3 {
 		t.Fatalf("expected trips=3 got %+v", rr.Trips)
-	}
-	if rr.TripDuration == nil || *rr.TripDuration != 40 {
-		t.Fatalf("expected trip_duration=40 got %+v", rr.TripDuration)
 	}
 }
 
@@ -80,12 +76,11 @@ func TestFindSchedule_EmptyList(t *testing.T) {
 
 func TestFindSchedule_StartTimeMismatch_NoMatch(t *testing.T) {
 	// A slot that declares start_times must not match a departure outside those times.
-	adv := 30
 	groupTrips := 3
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 	grp := model.StartTimeGroup{Times: []string{"14:40"}, Trips: &groupTrips}
-	slot := model.Slot{FirstShiftPreparationDuration: &adv, StartTimes: []model.StartTimeGroup{grp}}
+	slot := model.Slot{StartTimes: []model.StartTimeGroup{grp}}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
 
@@ -333,73 +328,98 @@ func TestFindSchedule_ExceptionRemapsWeekday(t *testing.T) {
 	}
 }
 
-func TestFindSchedule_FirstShiftPreparationTimeFromSlot(t *testing.T) {
+func TestFindSchedule_ShiftsMatchByFirstTripStart(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
-	ft := "09:30"
-	slot := model.Slot{FirstShiftPreparationTime: &ft}
-	sched := testSched(slot)
-	seasons := testSeasons(from, to)
-
-	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
-	if rr == nil {
-		t.Fatalf("expected resolved range")
-	}
-	if rr.FirstShiftPreparationTime == nil || *rr.FirstShiftPreparationTime != "09:30" {
-		t.Fatalf("expected FirstShiftPreparationTime=09:30, got %v", rr.FirstShiftPreparationTime)
-	}
-}
-
-func TestFindSchedule_FirstShiftPreparationCountFromSlot(t *testing.T) {
-	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
-	count := 2
-	slot := model.Slot{FirstShiftPreparationCount: &count}
-	sched := testSched(slot)
-	seasons := testSeasons(from, to)
-
-	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "", time.Friday, seasons)
-	if rr == nil {
-		t.Fatalf("expected resolved range")
-	}
-	if rr.FirstShiftPreparationCount == nil || *rr.FirstShiftPreparationCount != 2 {
-		t.Fatalf("expected FirstShiftPreparationCount=2, got %v", rr.FirstShiftPreparationCount)
-	}
-}
-
-func TestFindSchedule_GroupOverridesPreparationAndAftercareDurations(t *testing.T) {
-	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
-	slotPrep := 20
-	slotAftercare := 10
-	groupPrep := 25
-	groupAftercare := 15
-	groupLastAftercare := 35
-	grp := model.StartTimeGroup{
-		Times:                      []string{"10:00"},
-		PreparationDuration:        &groupPrep,
-		AftercareDuration:          &groupAftercare,
-		LastShiftAftercareDuration: &groupLastAftercare,
-	}
 	slot := model.Slot{
-		PreparationDuration: &slotPrep,
-		AftercareDuration:   &slotAftercare,
-		StartTimes:          []model.StartTimeGroup{grp},
+		Shifts: map[string]model.Shift{
+			"1": {
+				TripTimes: []model.TripTime{
+					{Start: "10:20", Duration: 50},
+					{Start: "11:40", Duration: 50},
+				},
+			},
+		},
 	}
 	sched := testSched(slot)
 	seasons := testSeasons(from, to)
 
-	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:20", time.Friday, seasons)
 	if rr == nil {
 		t.Fatalf("expected resolved range")
 	}
-	if rr.PreparationDuration == nil || *rr.PreparationDuration != 25 {
-		t.Fatalf("expected preparation_duration=25 got %+v", rr.PreparationDuration)
+	if len(rr.TripTimes) != 2 {
+		t.Fatalf("expected 2 trip times, got %d", len(rr.TripTimes))
 	}
-	if rr.AftercareDuration == nil || *rr.AftercareDuration != 15 {
-		t.Fatalf("expected aftercare_duration=15 got %+v", rr.AftercareDuration)
+}
+
+func TestFindSchedule_ShiftArrivePropagated(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	arrive := "9:15"
+	slot := model.Slot{
+		Shifts: map[string]model.Shift{
+			"1": {TripTimes: []model.TripTime{{Start: "10:20"}, {Start: "11:40"}}, Arrive: &arrive},
+		},
 	}
-	if rr.LastShiftAftercareDuration == nil || *rr.LastShiftAftercareDuration != 35 {
-		t.Fatalf("expected last_shift_aftercare_duration=35 got %+v", rr.LastShiftAftercareDuration)
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:20", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.Arrive == nil || *rr.Arrive != "9:15" {
+		t.Fatalf("expected Arrive=9:15, got %v", rr.Arrive)
+	}
+	if rr.Leave != nil {
+		t.Fatalf("expected nil Leave, got %v", rr.Leave)
+	}
+}
+
+func TestFindSchedule_ShiftLeavePropagated(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	leave := "15:00"
+	slot := model.Slot{
+		Shifts: map[string]model.Shift{
+			"1": {TripTimes: []model.TripTime{{Start: "10:20"}, {Start: "11:40"}}, Leave: &leave},
+		},
+	}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:20", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.Leave == nil || *rr.Leave != "15:00" {
+		t.Fatalf("expected Leave=15:00, got %v", rr.Leave)
+	}
+	if rr.Arrive != nil {
+		t.Fatalf("expected nil Arrive, got %v", rr.Arrive)
+	}
+}
+
+func TestFindSchedule_ShiftNoArriveLeavePropagatedAsNil(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	slot := model.Slot{
+		Shifts: map[string]model.Shift{
+			"1": {TripTimes: []model.TripTime{{Start: "10:20"}}},
+		},
+	}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:20", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.Arrive != nil {
+		t.Fatalf("expected nil Arrive, got %v", rr.Arrive)
+	}
+	if rr.Leave != nil {
+		t.Fatalf("expected nil Leave, got %v", rr.Leave)
 	}
 }

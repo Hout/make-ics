@@ -51,55 +51,6 @@ func TestValidateConfig_InvalidTimezone(t *testing.T) {
 	}
 }
 
-func TestValidateConfig_BothFirstShiftFieldsOnShiftType(t *testing.T) {
-	adv := 30
-	ft := "09:00"
-	cfg := model.Config{
-		Timezone: "Europe/Amsterdam",
-		Locale:   "nl_NL",
-		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftPreparationDuration: &adv, FirstShiftPreparationTime: &ft},
-		},
-	}
-	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error when both first_shift_advance and first_shift_time set on ShiftType")
-	}
-}
-
-func TestValidateConfig_BothFirstShiftFieldsOnSlot(t *testing.T) {
-	adv := 30
-	ft := "09:00"
-	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
-	cfg := model.Config{
-		Timezone: "Europe/Amsterdam",
-		Locale:   "nl_NL",
-		Seasons:  map[string]model.Season{"s": {from}},
-		ShiftType: map[string]model.ShiftType{
-			"A": {Schedules: []model.Schedule{{
-				Seasons: []string{"s"},
-				Slots:   []model.Slot{{FirstShiftPreparationDuration: &adv, FirstShiftPreparationTime: &ft}},
-			}}},
-		},
-	}
-	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error when both fields set on Slot")
-	}
-}
-
-func TestValidateConfig_InvalidFirstShiftTimeFormat(t *testing.T) {
-	ft := "9am"
-	cfg := model.Config{
-		Timezone: "Europe/Amsterdam",
-		Locale:   "nl_NL",
-		ShiftType: map[string]model.ShiftType{
-			"A": {FirstShiftPreparationTime: &ft},
-		},
-	}
-	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error for invalid first_shift_preparation_time format")
-	}
-}
-
 func TestValidateConfig_InvalidStartTime(t *testing.T) {
 	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
 	cfg := model.Config{
@@ -140,61 +91,131 @@ func TestValidateConfig_ValidStartTime(t *testing.T) {
 	}
 }
 
-func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
-	ft := "09:00"
+func TestValidateConfig_InvalidShiftKey(t *testing.T) {
 	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
 	cfg := model.Config{
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		Seasons:  map[string]model.Season{"s": {from}},
 		ShiftType: map[string]model.ShiftType{
-			"A": {
-				FirstShiftPreparationTime: &ft,
-				Schedules: []model.Schedule{{
-					Seasons: []string{"s"},
-					Slots:   []model.Slot{{}},
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"morning": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}},
+					},
 				}},
-			},
-		},
-	}
-	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
-		t.Fatalf("unexpected error for valid config: %v", err)
-	}
-}
-
-func TestValidateConfig_BothLastShiftAftercareFieldsOnShiftType(t *testing.T) {
-	aftercare := 30
-	aftercareTime := "16:30"
-	cfg := model.Config{
-		Timezone: "Europe/Amsterdam",
-		Locale:   "nl_NL",
-		ShiftType: map[string]model.ShiftType{
-			"A": {LastShiftAftercareDuration: &aftercare, LastShiftAftercareTime: &aftercareTime},
+			}}},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
-		t.Fatalf("expected error when both last_shift_aftercare_duration and last_shift_aftercare_time are set on ShiftType")
+		t.Fatalf("expected error for non-numeric shift key")
 	}
 }
 
-func TestValidateConfig_ValidLastShiftAftercareTime(t *testing.T) {
-	aftercareTime := "16:30"
+func TestValidateConfig_EmptyShiftTripTimes(t *testing.T) {
 	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
 	cfg := model.Config{
 		Timezone: "Europe/Amsterdam",
 		Locale:   "nl_NL",
 		Seasons:  map[string]model.Season{"s": {from}},
 		ShiftType: map[string]model.ShiftType{
-			"A": {
-				LastShiftAftercareTime: &aftercareTime,
-				Schedules: []model.Schedule{{
-					Seasons: []string{"s"},
-					Slots:   []model.Slot{{}},
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{"1": {}},
 				}},
-			},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for empty shift trip_times")
+	}
+}
+
+func TestValidateConfig_InvalidShiftTripTimeFormat(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {TripTimes: []model.TripTime{{Start: "9am", Duration: 50}}},
+					},
+				}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for invalid shift trip_times format")
+	}
+}
+
+func TestValidateConfig_NonIncreasingShiftTripTimes(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}, {Start: "10:00", Duration: 50}}},
+					},
+				}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for overlapping or non-increasing shift trip_times")
+	}
+}
+
+func TestValidateConfig_ShiftsAndStartTimesConflict(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts:     map[string]model.Shift{"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}}},
+					StartTimes: []model.StartTimeGroup{{Times: []string{"10:00"}}},
+				}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error when both shifts and start_times are set on same day schedule")
+	}
+}
+
+func TestValidateConfig_ValidShiftTripTimes(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}, {Start: "11:20", Duration: 50}}},
+					},
+				}},
+			}}},
 		},
 	}
 	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
-		t.Fatalf("unexpected error for valid last_shift_aftercare_time: %v", err)
+		t.Fatalf("unexpected error for valid shifts trip_times: %v", err)
 	}
 }

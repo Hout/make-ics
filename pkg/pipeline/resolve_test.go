@@ -9,12 +9,8 @@ import (
 
 func makeRow(code, date, hhmm string) parsedRow {
 	d, _ := time.Parse("2006-01-02", date)
-	var h, m int
-	_, _ = time.Parse("15:04", hhmm) // parse into h/m below
 	t, _ := time.Parse("15:04", hhmm)
-	h = t.Hour()
-	m = t.Minute()
-	return parsedRow{Code: code, Date: d, Hour: h, Min: m}
+	return parsedRow{Code: code, Date: d, Hour: t.Hour(), Min: t.Minute()}
 }
 
 func TestResolveRows_UnknownCode_DefaultAdvanceAndDuration(t *testing.T) {
@@ -36,123 +32,6 @@ func TestResolveRows_UnknownCode_DefaultAdvanceAndDuration(t *testing.T) {
 	}
 }
 
-func TestResolveRows_FirstShiftPreparationDuration(t *testing.T) {
-	adv := 45
-	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationDuration: &adv}}
-	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].advance != 45 {
-		t.Errorf("advance: want 45 got %d", resolved[0].advance)
-	}
-}
-
-func TestResolveRows_FirstShiftPreparationTime(t *testing.T) {
-	ft := "09:15"
-	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationTime: &ft}}
-	// departure 10:00; prep time 09:15 → advance = 45 min
-	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].advance != 45 {
-		t.Errorf("advance: want 45 got %d", resolved[0].advance)
-	}
-}
-
-func TestResolveRows_FirstShiftPreparationTime_AtDeparture_Error(t *testing.T) {
-	ft := "10:00"
-	shifts := map[string]model.ShiftType{"A": {FirstShiftPreparationTime: &ft}}
-	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
-	var warnings []string
-	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err == nil {
-		t.Fatal("expected error for prep time == departure")
-	}
-}
-
-func TestResolveRows_LastShiftRemains(t *testing.T) {
-	rem := 30
-	shifts := map[string]model.ShiftType{"A": {LastShiftAftercare: &rem}}
-	rows := []parsedRow{
-		makeRow("A", "2026-04-03", "10:00"),
-		makeRow("A", "2026-04-03", "12:00"),
-	}
-	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].remains != 0 {
-		t.Errorf("first row: remains should be 0 got %d", resolved[0].remains)
-	}
-	if resolved[1].remains != 30 {
-		t.Errorf("last row: remains want 30 got %d", resolved[1].remains)
-	}
-	if resolved[1].durationMinutes != defaultAppointmentMinutes+30 {
-		t.Errorf("last row: durationMinutes want %d got %d", defaultAppointmentMinutes+30, resolved[1].durationMinutes)
-	}
-}
-
-func TestResolveRows_CrossLevelWarningDeduped(t *testing.T) {
-	ft := "09:15"
-	dur := 45
-	shifts := map[string]model.ShiftType{"A": {
-		FirstShiftPreparationTime:     &ft,
-		FirstShiftPreparationDuration: &dur,
-	}}
-	rows := []parsedRow{
-		makeRow("A", "2026-04-03", "10:00"),
-		makeRow("A", "2026-04-04", "10:00"),
-	}
-	warned := make(map[string]bool)
-	var warnings []string
-	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, warned, &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !warned["A"] {
-		t.Error("expected warnedCrossLevel[A] to be set")
-	}
-	// warning should only be registered once despite two rows for the same code
-	if len(warned) != 1 {
-		t.Errorf("expected 1 entry in warned map got %d", len(warned))
-	}
-	// the warning message should also appear in the returned warnings slice
-	if len(warnings) != 1 {
-		t.Errorf("expected 1 warning string, got %d: %v", len(warnings), warnings)
-	}
-}
-
-func TestResolveRows_PositionalFallback_NoStartTimes(t *testing.T) {
-	adv := 45
-	count := 1
-	shifts := map[string]model.ShiftType{"A": {
-		FirstShiftPreparationDuration: &adv,
-		FirstShiftPreparationCount:    &count,
-	}}
-	rows := []parsedRow{
-		makeRow("A", "2026-04-03", "10:00"), // position 0 → first shift
-		makeRow("A", "2026-04-03", "12:00"), // position 1 → not first
-	}
-	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].advance != 45 {
-		t.Errorf("position 0: advance want 45 got %d", resolved[0].advance)
-	}
-	if resolved[1].advance != 10 {
-		t.Errorf("position 1: advance want 10 got %d", resolved[1].advance)
-	}
-}
-
 func TestResolveRows_SummaryAndDescriptionPrefix(t *testing.T) {
 	shifts := map[string]model.ShiftType{
 		"A": {Summary: "Alpha Shift", Description: "Route detail"},
@@ -171,90 +50,144 @@ func TestResolveRows_SummaryAndDescriptionPrefix(t *testing.T) {
 	}
 }
 
-func TestResolveRows_GeneralPreparationDuration_AndFirstShiftOverride(t *testing.T) {
-	prep := 20
-	firstPrep := 45
-	count := 1
-	shifts := map[string]model.ShiftType{"A": {
-		PreparationDuration:           &prep,
-		FirstShiftPreparationDuration: &firstPrep,
-		FirstShiftPreparationCount:    &count,
-	}}
-	rows := []parsedRow{
-		makeRow("A", "2026-04-03", "10:00"),
-		makeRow("A", "2026-04-03", "12:00"),
+func TestResolveRows_ArriveFromRangeEntry(t *testing.T) {
+	arrive := "09:15"
+	leave := "14:20"
+	seasons := map[string]model.Season{
+		"s": {{
+			From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+			To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		}},
 	}
+	shifts := map[string]model.ShiftType{
+		"A": {
+			Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {
+							TripTimes: []model.TripTime{
+								{Start: "10:00", Duration: 50},
+								{Start: "11:30", Duration: 50},
+							},
+							Arrive: &arrive,
+							Leave:  &leave,
+						},
+					},
+				}},
+			}},
+		},
+	}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
 	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	resolved, err := resolveRows(rows, 30, shifts, seasons, nil, nil, make(map[string]bool), &warnings)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// arrive=9:15, departure=10:00 → advance=45
 	if resolved[0].advance != 45 {
-		t.Errorf("first row advance: want 45 got %d", resolved[0].advance)
+		t.Errorf("advance: want 45 got %d", resolved[0].advance)
 	}
-	if resolved[1].advance != 20 {
-		t.Errorf("second row advance: want 20 got %d", resolved[1].advance)
-	}
-}
-
-func TestResolveRows_GeneralAftercare_AndLastShiftOverrides(t *testing.T) {
-	aftercare := 15
-	lastAftercare := 30
-	shifts := map[string]model.ShiftType{"A": {
-		AftercareDuration:          &aftercare,
-		LastShiftAftercareDuration: &lastAftercare,
-	}}
-	rows := []parsedRow{
-		makeRow("A", "2026-04-03", "10:00"),
-		makeRow("A", "2026-04-03", "12:00"),
-	}
-	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].remains != 15 {
-		t.Errorf("first row remains: want 15 got %d", resolved[0].remains)
-	}
-	if resolved[0].durationMinutes != defaultAppointmentMinutes+15 {
-		t.Errorf("first row durationMinutes: want %d got %d", defaultAppointmentMinutes+15, resolved[0].durationMinutes)
-	}
-	if resolved[1].remains != 30 {
-		t.Errorf("last row remains: want 30 got %d", resolved[1].remains)
-	}
-	if resolved[1].durationMinutes != defaultAppointmentMinutes+30 {
-		t.Errorf("last row durationMinutes: want %d got %d", defaultAppointmentMinutes+30, resolved[1].durationMinutes)
+	// leave=14:20, departure=10:00 → durationMinutes=260
+	if resolved[0].durationMinutes != 260 {
+		t.Errorf("durationMinutes: want 260 got %d", resolved[0].durationMinutes)
 	}
 }
 
-func TestResolveRows_LastShiftAftercareTime(t *testing.T) {
-	aftercareTime := "16:30"
-	shifts := map[string]model.ShiftType{"A": {
-		LastShiftAftercareTime: &aftercareTime,
-	}}
-	rows := []parsedRow{makeRow("A", "2026-04-03", "12:00")}
+func TestResolveRows_ArriveAtOrAfterDeparture_Error(t *testing.T) {
+	arrive := "10:00" // equal to departure → must error
+	leave := "14:00"
+	seasons := map[string]model.Season{
+		"s": {{
+			From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+			To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		}},
+	}
+	shifts := map[string]model.ShiftType{
+		"A": {
+			Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {
+							TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}, {Start: "11:30", Duration: 50}},
+							Arrive:    &arrive,
+							Leave:     &leave,
+						},
+					},
+				}},
+			}},
+		},
+	}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
 	var warnings []string
-	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved[0].remains != 30 {
-		t.Errorf("remains: want 30 got %d", resolved[0].remains)
-	}
-	if resolved[0].durationMinutes != defaultAppointmentMinutes+30 {
-		t.Errorf("durationMinutes: want %d got %d", defaultAppointmentMinutes+30, resolved[0].durationMinutes)
-	}
-}
-
-func TestResolveRows_LastShiftAftercareTime_BeforeComputedEnd_Error(t *testing.T) {
-	aftercareTime := "15:30"
-	shifts := map[string]model.ShiftType{"A": {
-		LastShiftAftercareTime: &aftercareTime,
-	}}
-	rows := []parsedRow{makeRow("A", "2026-04-03", "12:00")}
-	var warnings []string
-	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	_, err := resolveRows(rows, 30, shifts, seasons, nil, nil, make(map[string]bool), &warnings)
 	if err == nil {
-		t.Fatal("expected error when last_shift_aftercare_time is before computed end")
+		t.Fatal("expected error when arrive >= departure")
+	}
+}
+
+func TestResolveRows_SingleTripNoLeave_Error(t *testing.T) {
+	seasons := map[string]model.Season{
+		"s": {{
+			From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+			To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		}},
+	}
+	shifts := map[string]model.ShiftType{
+		"A": {
+			Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {TripTimes: []model.TripTime{{Start: "10:00"}}},
+					},
+				}},
+			}},
+		},
+	}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
+	var warnings []string
+	_, err := resolveRows(rows, 30, shifts, seasons, nil, nil, make(map[string]bool), &warnings)
+	if err == nil {
+		t.Fatal("expected error for single-trip shift without leave")
+	}
+}
+
+func TestResolveRows_MultiTripAutoLeave(t *testing.T) {
+	seasons := map[string]model.Season{
+		"s": {{
+			From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+			To:   time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC),
+		}},
+	}
+	shifts := map[string]model.ShiftType{
+		"A": {
+			Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots: []model.Slot{{
+					Shifts: map[string]model.Shift{
+						"1": {
+							TripTimes: []model.TripTime{
+								{Start: "10:00", Duration: 50},
+								{Start: "11:30", Duration: 50},
+							},
+							// No explicit leave: auto-compute from last trip end
+						},
+					},
+				}},
+			}},
+		},
+	}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "10:00")}
+	var warnings []string
+	resolved, err := resolveRows(rows, 30, shifts, seasons, nil, nil, make(map[string]bool), &warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// lastTrip = 11:30 + 50min = 12:20 → leaveMinutes=740
+	// departure = 10:00 = 600 → durationMinutes=140
+	if resolved[0].durationMinutes != 140 {
+		t.Errorf("durationMinutes: want 140 got %d", resolved[0].durationMinutes)
 	}
 }

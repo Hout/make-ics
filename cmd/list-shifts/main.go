@@ -300,11 +300,31 @@ func pickRepresentativeDay(byCode map[string][]windowEntry, orderedCodes []strin
 	return best
 }
 
-// depBar holds one departure's start time and its total span in minutes
-// (trips × tripDuration + max(0, trips−1) × breakDuration).
+// depBar holds one departure's start time and its total span in minutes.
 type depBar struct {
 	start         string
 	totalDuration int
+}
+
+func shiftTripSpanMinutes(shift model.Shift) (string, int, bool) {
+	if len(shift.TripTimes) == 0 {
+		return "", 0, false
+	}
+	firstStart, err := time.Parse("15:04", shift.TripTimes[0].Start)
+	if err != nil {
+		return "", 0, false
+	}
+	lastTrip := shift.TripTimes[len(shift.TripTimes)-1]
+	lastStart, err := time.Parse("15:04", lastTrip.Start)
+	if err != nil || lastTrip.Duration <= 0 {
+		return "", 0, false
+	}
+	lastEnd := time.Date(0, 1, 1, lastStart.Hour(), lastStart.Minute(), 0, 0, time.UTC).Add(time.Duration(lastTrip.Duration) * time.Minute)
+	span := int(lastEnd.Sub(firstStart).Minutes())
+	if span <= 0 {
+		return "", 0, false
+	}
+	return shift.TripTimes[0].Start, span, true
 }
 
 // resolveDeparturesForWeekday returns one depBar per unique departure start time
@@ -319,6 +339,18 @@ func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar 
 			if !weekdayAllowed(slot, wd) {
 				continue
 			}
+			if len(slot.Shifts) > 0 {
+				for _, shift := range slot.Shifts {
+					start, total, ok := shiftTripSpanMinutes(shift)
+					if !ok {
+						continue
+					}
+					if _, exists := seen[start]; !exists {
+						seen[start] = depBar{start: start, totalDuration: total}
+					}
+				}
+				continue
+			}
 			for _, g := range slot.StartTimes {
 				var trips *int
 				if g.Trips != nil {
@@ -328,35 +360,10 @@ func resolveDeparturesForWeekday(group []windowEntry, wd time.Weekday) []depBar 
 				} else {
 					trips = e.shiftType.Trips
 				}
-				var tripDuration *int
-				if g.TripDuration != nil {
-					tripDuration = g.TripDuration
-				} else if slot.TripDuration != nil {
-					tripDuration = slot.TripDuration
-				} else {
-					tripDuration = e.shiftType.TripDuration
-				}
-				if trips == nil || tripDuration == nil {
-					continue
-				}
-				var breakDuration *int
-				if g.BreakDuration != nil {
-					breakDuration = g.BreakDuration
-				} else if slot.BreakDuration != nil {
-					breakDuration = slot.BreakDuration
-				} else {
-					breakDuration = e.shiftType.BreakDuration
-				}
-				bd := 0
-				if breakDuration != nil {
-					bd = *breakDuration
-				}
-				n := *trips
-				td := *tripDuration
-				total := n*td + max(0, n-1)*bd
+				_ = trips // trip duration no longer stored at this level
 				for _, ts := range g.Times {
 					if _, exists := seen[ts]; !exists {
-						seen[ts] = depBar{start: ts, totalDuration: total}
+						seen[ts] = depBar{start: ts, totalDuration: 0}
 					}
 				}
 			}
@@ -382,6 +389,21 @@ func mergedTimesForWeekday(group []windowEntry, wd time.Weekday) (string, error)
 	for _, e := range group {
 		for _, slot := range e.sched.Slots {
 			if !weekdayAllowed(slot, wd) {
+				continue
+			}
+			if len(slot.Shifts) > 0 {
+				for _, shift := range slot.Shifts {
+					if len(shift.TripTimes) == 0 {
+						continue
+					}
+					ts := shift.TripTimes[0].Start
+					if _, exists := seen[ts]; exists {
+						continue
+					}
+					trips := len(shift.TripTimes)
+					seen[ts] = fmt.Sprintf("%s(%d)", ts, trips)
+					keys = append(keys, ts)
+				}
 				continue
 			}
 			for _, g := range slot.StartTimes {
@@ -424,6 +446,14 @@ func timesForWeekday(slot model.Slot, wd time.Weekday) string {
 		return "\u2013"
 	}
 	var times []string
+	if len(slot.Shifts) > 0 {
+		for _, shift := range slot.Shifts {
+			if len(shift.TripTimes) == 0 {
+				continue
+			}
+			times = append(times, shift.TripTimes[0].Start)
+		}
+	}
 	for _, g := range slot.StartTimes {
 		times = append(times, g.Times...)
 	}

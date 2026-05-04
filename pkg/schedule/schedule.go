@@ -18,6 +18,10 @@ type Translator interface {
 // GetTrips returns the effective trip count, with rangeEntry taking precedence
 // over the shift-level setting. Returns nil when no count is configured.
 func GetTrips(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && len(rangeEntry.TripTimes) > 0 {
+		n := len(rangeEntry.TripTimes)
+		return &n
+	}
 	if rangeEntry != nil && rangeEntry.Trips != nil {
 		return rangeEntry.Trips
 	}
@@ -27,152 +31,91 @@ func GetTrips(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
 	return nil
 }
 
-// GetPreparationDuration returns the effective general preparation duration for
-// all shifts, with rangeEntry taking precedence over the shift setting.
-func GetPreparationDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
-	if rangeEntry != nil && rangeEntry.PreparationDuration != nil {
-		return rangeEntry.PreparationDuration
+// BuildProgramFromTripTimes returns a multi-line program using explicit trip windows.
+func BuildProgramFromTripTimes(tripTimes []model.TripTime, advance int, remains int, t Translator) string {
+	if len(tripTimes) == 0 {
+		return ""
 	}
-	return shift.PreparationDuration
-}
+	firstStart, err := time.Parse("15:04", tripTimes[0].Start)
+	if err != nil {
+		return ""
+	}
+	base := time.Date(0, 1, 1, firstStart.Hour(), firstStart.Minute(), 0, 0, time.UTC)
 
-// GetAftercareDuration returns the effective general aftercare duration for all
-// shifts, with rangeEntry taking precedence over the shift setting.
-func GetAftercareDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
-	if rangeEntry != nil && rangeEntry.AftercareDuration != nil {
-		return rangeEntry.AftercareDuration
-	}
-	return shift.AftercareDuration
-}
-
-func shiftLastAftercareDuration(shift model.ShiftType) *int {
-	if shift.LastShiftAftercareDuration != nil {
-		return shift.LastShiftAftercareDuration
-	}
-	return shift.LastShiftAftercare
-}
-
-// GetLastShiftAftercareDuration returns the last-shift-specific aftercare
-// duration override, with rangeEntry taking precedence over shift settings.
-func GetLastShiftAftercareDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
-	if rangeEntry != nil && rangeEntry.LastShiftAftercareDuration != nil {
-		return rangeEntry.LastShiftAftercareDuration
-	}
-	return shiftLastAftercareDuration(shift)
-}
-
-// GetLastShiftAftercareTime returns the last-shift-specific fixed end time for
-// aftercare, with rangeEntry taking precedence over the shift setting.
-func GetLastShiftAftercareTime(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *string {
-	if rangeEntry != nil && rangeEntry.LastShiftAftercareTime != nil {
-		return rangeEntry.LastShiftAftercareTime
-	}
-	return shift.LastShiftAftercareTime
-}
-
-// GetShiftDurationMinutes returns the total shift duration in minutes using the
-// formula trips×tripDuration + max(0,trips−1)×breakDuration. Falls back to
-// defaultMinutes when trips or tripDuration are not configured.
-func GetShiftDurationMinutes(shift model.ShiftType, rangeEntry *dr.ResolvedRange, trips *int, defaultMinutes int) int {
-	if trips == nil || *trips == 0 {
-		return defaultMinutes
-	}
-	// merged lookup: range overrides shift
-	var tripDuration *int
-	var breakDuration *int
-	if rangeEntry != nil && rangeEntry.TripDuration != nil {
-		tripDuration = rangeEntry.TripDuration
-	} else {
-		tripDuration = shift.TripDuration
-	}
-	if tripDuration == nil {
-		return defaultMinutes
-	}
-	if rangeEntry != nil && rangeEntry.BreakDuration != nil {
-		breakDuration = rangeEntry.BreakDuration
-	} else {
-		breakDuration = shift.BreakDuration
-	}
-	bd := 0
-	if breakDuration != nil {
-		bd = *breakDuration
-	}
-	td := *tripDuration
-	n := *trips
-	return n*td + max(0, n-1)*bd
-}
-
-// GetLastShiftAftercare returns the extra minutes appended to the last shift of
-// a (code, date) group, with rangeEntry taking precedence over the shift setting.
-func GetLastShiftAftercare(shift model.ShiftType, rangeEntry *dr.ResolvedRange) int {
-	if aftercare := GetLastShiftAftercareDuration(shift, rangeEntry); aftercare != nil {
-		return *aftercare
-	}
-	return 0
-}
-
-// GetDurationRationale returns a human-readable breakdown of how the shift
-// duration is computed, e.g. "3x40+2x10=140min+15min".
-func GetDurationRationale(shift model.ShiftType, rangeEntry *dr.ResolvedRange, trips *int, defaultMinutes int, lastShiftRemains int) string {
-	if trips != nil && *trips > 0 {
-		var tripDuration *int
-		var breakDuration *int
-		if rangeEntry != nil && rangeEntry.TripDuration != nil {
-			tripDuration = rangeEntry.TripDuration
-		} else {
-			tripDuration = shift.TripDuration
+	var lines []string
+	if advance > 0 {
+		prep := base.Add(-time.Duration(advance) * time.Minute)
+		prepLabel := "Preparation"
+		if t != nil {
+			prepLabel = t.T("Preparation", nil)
 		}
-		if tripDuration != nil {
-			if rangeEntry != nil && rangeEntry.BreakDuration != nil {
-				breakDuration = rangeEntry.BreakDuration
-			} else {
-				breakDuration = shift.BreakDuration
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", prep.Hour(), prep.Minute()), prepLabel, t))
+	}
+
+	for i, trip := range tripTimes {
+		start, errStart := time.Parse("15:04", trip.Start)
+		if errStart != nil {
+			return ""
+		}
+		hasDuration := trip.Duration > 0
+		end := time.Date(0, 1, 1, start.Hour(), start.Minute(), 0, 0, time.UTC)
+		if hasDuration {
+			end = end.Add(time.Duration(trip.Duration) * time.Minute)
+		}
+		tripLabel := fmt.Sprintf("Trip %d", i+1)
+		if t != nil {
+			tripLabel = t.T("Trip {n}", map[string]any{"n": i + 1})
+		}
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", start.Hour(), start.Minute()), tripLabel, t))
+
+		if i < len(tripTimes)-1 && hasDuration {
+			nextStart, err := time.Parse("15:04", tripTimes[i+1].Start)
+			if err != nil {
+				return ""
 			}
-			td := *tripDuration
-			bd := 0
-			if breakDuration != nil {
-				bd = *breakDuration
+			if nextStart.After(end) {
+				breakLabel := fmt.Sprintf("Break %d", i+1)
+				if t != nil {
+					breakLabel = t.T("Break {n}", map[string]any{"n": i + 1})
+				}
+				lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", end.Hour(), end.Minute()), breakLabel, t))
 			}
-			n := *trips
-			parts := fmt.Sprintf("%dx%d", n, td)
-			nbreaks := max(0, n-1)
-			if nbreaks > 0 && bd > 0 {
-				parts = fmt.Sprintf("%s+%dx%d", parts, nbreaks, bd)
-			}
-			base := n*td + nbreaks*bd
-			rationale := fmt.Sprintf("%s=%dmin", parts, base)
-			if lastShiftRemains > 0 {
-				rationale = fmt.Sprintf("%s+%dmin", rationale, lastShiftRemains)
-			}
-			return rationale
 		}
 	}
-	return fmt.Sprintf("%dmin (default)", defaultMinutes)
-}
 
-// BuildTripTimes returns a slice of (Start, End) time strings for each trip,
-// computed using time.Time arithmetic to avoid modular int math.
-func BuildTripTimes(hour, minute, trips, tripDuration, breakDuration int) []struct{ Start, End string } {
-	out := make([]struct{ Start, End string }, 0, trips)
-	cur := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
-	for range trips {
-		end := cur.Add(time.Duration(tripDuration) * time.Minute)
-		out = append(out, struct{ Start, End string }{
-			Start: fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()),
-			End:   fmt.Sprintf("%02d:%02d", end.Hour(), end.Minute()),
-		})
-		cur = end.Add(time.Duration(breakDuration) * time.Minute)
+	if remains > 0 {
+		lastTrip := tripTimes[len(tripTimes)-1]
+		lastStart, err := time.Parse("15:04", lastTrip.Start)
+		if err != nil {
+			return ""
+		}
+		afterBase := time.Date(0, 1, 1, lastStart.Hour(), lastStart.Minute(), 0, 0, time.UTC)
+		if lastTrip.Duration > 0 {
+			afterBase = afterBase.Add(time.Duration(lastTrip.Duration) * time.Minute)
+		}
+		afterEnd := afterBase.Add(time.Duration(remains) * time.Minute)
+		endStr := fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())
+		afterLabel := fmt.Sprintf("aftercare → %s", endStr)
+		if t != nil {
+			afterLabel = t.T("aftercare → {time}", map[string]any{"time": endStr})
+		}
+		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", afterBase.Hour(), afterBase.Minute()), afterLabel, t))
 	}
-	return out
+
+	return strings.Join(lines, "\n")
 }
 
-// FormatTripSchedule formats a list of (Start, End) trip segments into a
-// single human-readable line, e.g. "3 trips: 10:00-11:00, 11:10-12:10 and 12:20-13:20".
-func FormatTripSchedule(tripTimes []struct{ Start, End string }, t Translator) string {
+// FormatExplicitTripSchedule formats explicit trip starts+durations into one line.
+func FormatExplicitTripSchedule(tripTimes []model.TripTime, t Translator) string {
 	n := len(tripTimes)
 	segments := make([]string, n)
-	for i, seg := range tripTimes {
-		segments[i] = fmt.Sprintf("%s-%s", seg.Start, seg.End)
+	for i, trip := range tripTimes {
+		start, err := time.Parse("15:04", trip.Start)
+		if err != nil || trip.Duration <= 0 {
+			continue
+		}
+		end := time.Date(0, 1, 1, start.Hour(), start.Minute(), 0, 0, time.UTC).Add(time.Duration(trip.Duration) * time.Minute)
+		segments[i] = fmt.Sprintf("%s-%02d:%02d", trip.Start, end.Hour(), end.Minute())
 	}
 	tripWord := "trip"
 	andWord := "and"
@@ -194,47 +137,4 @@ func formatTimeLine(timeStr, label string, t Translator) string {
 		return timeStr + " " + label
 	}
 	return t.T("{time} {text}", map[string]any{"time": timeStr, "text": label})
-}
-
-// BuildProgram returns a multi-line program like the Python original.
-func BuildProgram(hour int, minute int, advance int, trips int, tripDuration int, breakDuration int, remains int, t Translator) string {
-	base := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
-	var lines []string
-	if advance > 0 {
-		prep := base.Add(-time.Duration(advance) * time.Minute)
-		prepLabel := "Preparation"
-		if t != nil {
-			prepLabel = t.T("Preparation", nil)
-		}
-		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", prep.Hour(), prep.Minute()), prepLabel, t))
-	}
-	cur := base
-	for i := 1; i <= trips; i++ {
-		tripLabel := fmt.Sprintf("Trip %d", i)
-		if t != nil {
-			tripLabel = t.T("Trip {n}", map[string]any{"n": i})
-		}
-		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()), tripLabel, t))
-		end := cur.Add(time.Duration(tripDuration) * time.Minute)
-		if i < trips {
-			breakLabel := fmt.Sprintf("Break %d", i)
-			if t != nil {
-				breakLabel = t.T("Break {n}", map[string]any{"n": i})
-			}
-			lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", end.Hour(), end.Minute()), breakLabel, t))
-			cur = end.Add(time.Duration(breakDuration) * time.Minute)
-		} else {
-			cur = end
-		}
-	}
-	if remains > 0 {
-		afterEnd := cur.Add(time.Duration(remains) * time.Minute)
-		endStr := fmt.Sprintf("%02d:%02d", afterEnd.Hour(), afterEnd.Minute())
-		afterLabel := fmt.Sprintf("aftercare \u2192 %s", endStr)
-		if t != nil {
-			afterLabel = t.T("aftercare \u2192 {time}", map[string]any{"time": endStr})
-		}
-		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", cur.Hour(), cur.Minute()), afterLabel, t))
-	}
-	return strings.Join(lines, "\n")
 }

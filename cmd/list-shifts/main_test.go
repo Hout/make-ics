@@ -245,6 +245,19 @@ func TestTimesForWeekday_Empty(t *testing.T) {
 	}
 }
 
+func TestTimesForWeekday_UsesShiftsFirstTripStart(t *testing.T) {
+	slot := model.Slot{
+		Shifts: map[string]model.Shift{
+			"2": {TripTimes: []model.TripTime{{Start: "14:00", Duration: 50}}},
+			"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}},
+		},
+	}
+	got := timesForWeekday(slot, time.Monday)
+	if got != "10:00, 14:00" {
+		t.Errorf("got %q want %q", got, "10:00, 14:00")
+	}
+}
+
 // --- formatDayRange ---
 
 func TestFormatDayRange(t *testing.T) {
@@ -325,17 +338,23 @@ func TestRenderMermaidCharts_Structure(t *testing.T) {
 		},
 		ShiftType: map[string]model.ShiftType{
 			"VRK_": {
-				Summary:       "VRK",
-				Trips:         intPtr(2),
-				TripDuration:  intPtr(75),
-				BreakDuration: intPtr(30),
+				Summary: "VRK",
 				Schedules: []model.Schedule{
 					{
 						Seasons: []string{"spring"},
 						Slots: []model.Slot{
 							{
-								Weekdays:   []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
-								StartTimes: []model.StartTimeGroup{{Times: []string{"10:15", "13:45"}}},
+								Weekdays: []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+								Shifts: map[string]model.Shift{
+									"1": {TripTimes: []model.TripTime{
+										{Start: "10:15", Duration: 75},
+										{Start: "11:30", Duration: 75},
+									}},
+									"2": {TripTimes: []model.TripTime{
+										{Start: "13:45", Duration: 75},
+										{Start: "15:00", Duration: 75},
+									}},
+								},
 							},
 						},
 					},
@@ -350,10 +369,10 @@ func TestRenderMermaidCharts_Structure(t *testing.T) {
 		"gantt",
 		"dateFormat HH:mm",
 		"section VRK",
-		// 10:15 departure: 2 trips × 75m + 1 break × 30m = 180m total span
-		"10h15 : 10:15, 180m",
-		// 13:45 departure: same config = 180m
-		"13h45 : 13:45, 180m",
+		// shift 1: first trip 10:15, last trip end 11:30+75=12:45, span=150m
+		"10h15 : 10:15, 150m",
+		// shift 2: first trip 13:45, last trip end 15:00+75=16:15, span=150m
+		"13h45 : 13:45, 150m",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in mermaid output\nfull output:\n%s", want, out)

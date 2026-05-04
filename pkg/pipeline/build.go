@@ -15,16 +15,14 @@ func buildEvents(resolved []resolvedRow, locTZ *time.Location, loc *i18n.Localiz
 	for _, r := range resolved {
 		p := r.parsed
 		description := r.description
-		if r.trips != nil {
-			if r.tripDurVal != nil {
-				prog := schedule.BuildProgram(p.Hour, p.Min, r.advance, *r.trips, *r.tripDurVal, r.breakDurVal, r.remains, loc)
-				description += prog
-			} else {
-				description += fmt.Sprintf("%02d:%02d ", p.Hour, p.Min)
-				description += loc.T("Start", nil)
-				description += "\n" + loc.T("- {n}m in advance", map[string]any{"n": r.advance})
-				description += fmt.Sprintf("\n%d %s", *r.trips, loc.N("trip", *r.trips, nil))
-			}
+		if len(r.tripTimes) > 0 {
+			prog := schedule.BuildProgramFromTripTimes(r.tripTimes, r.advance, r.remains, loc)
+			description += prog
+		} else if r.trips != nil {
+			description += fmt.Sprintf("%02d:%02d ", p.Hour, p.Min)
+			description += loc.T("Start", nil)
+			description += "\n" + loc.T("- {n}m in advance", map[string]any{"n": r.advance})
+			description += fmt.Sprintf("\n%d %s", *r.trips, loc.N("trip", *r.trips, nil))
 		} else {
 			description += fmt.Sprintf("%02d:%02d ", p.Hour, p.Min)
 			description += loc.T("Start", nil)

@@ -54,7 +54,7 @@ shift_type:
     trip_duration: 60
     preparation_duration: 30
     aftercare_duration: 30
-    schedules:
+    season_schedules:
       - seasons: [laagseizoen]
         day_schedules:
           - weekdays: ["Sat", "Sun"]
@@ -99,10 +99,10 @@ Als zowel `last_shift_aftercare_time` als `last_shift_aftercare_duration` zijn i
 
 ### Roosters, dagroosters en begintijden
 
-Elke invoer onder `schedules` geldt wanneer de dienstdatum binnen een van de bijbehorende `seasons` valt. Binnen een rooster beperken `day_schedules` het tot weekdagen:
+Elke invoer onder `season_schedules` geldt wanneer de dienstdatum binnen een van de bijbehorende `seasons` valt. Binnen een rooster beperken `day_schedules` het tot weekdagen:
 
 ```yaml
-schedules:
+season_schedules:
   - seasons: [laagseizoen]
     day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]
