@@ -161,3 +161,40 @@ func TestValidateConfig_ValidFirstShiftTime(t *testing.T) {
 		t.Fatalf("unexpected error for valid config: %v", err)
 	}
 }
+
+func TestValidateConfig_BothLastShiftAftercareFieldsOnShiftType(t *testing.T) {
+	aftercare := 30
+	aftercareTime := "16:30"
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		ShiftType: map[string]model.ShiftType{
+			"A": {LastShiftAftercareDuration: &aftercare, LastShiftAftercareTime: &aftercareTime},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error when both last_shift_aftercare_duration and last_shift_aftercare_time are set on ShiftType")
+	}
+}
+
+func TestValidateConfig_ValidLastShiftAftercareTime(t *testing.T) {
+	aftercareTime := "16:30"
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"A": {
+				LastShiftAftercareTime: &aftercareTime,
+				Schedules: []model.Schedule{{
+					Seasons: []string{"s"},
+					Slots:   []model.Slot{{}},
+				}},
+			},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("unexpected error for valid last_shift_aftercare_time: %v", err)
+	}
+}

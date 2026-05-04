@@ -366,3 +366,40 @@ func TestFindSchedule_FirstShiftPreparationCountFromSlot(t *testing.T) {
 		t.Fatalf("expected FirstShiftPreparationCount=2, got %v", rr.FirstShiftPreparationCount)
 	}
 }
+
+func TestFindSchedule_GroupOverridesPreparationAndAftercareDurations(t *testing.T) {
+	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	slotPrep := 20
+	slotAftercare := 10
+	groupPrep := 25
+	groupAftercare := 15
+	groupLastAftercare := 35
+	grp := model.StartTimeGroup{
+		Times:                      []string{"10:00"},
+		PreparationDuration:        &groupPrep,
+		AftercareDuration:          &groupAftercare,
+		LastShiftAftercareDuration: &groupLastAftercare,
+	}
+	slot := model.Slot{
+		PreparationDuration: &slotPrep,
+		AftercareDuration:   &slotAftercare,
+		StartTimes:          []model.StartTimeGroup{grp},
+	}
+	sched := testSched(slot)
+	seasons := testSeasons(from, to)
+
+	rr := FindSchedule([]model.Schedule{sched}, time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC), "10:00", time.Friday, seasons)
+	if rr == nil {
+		t.Fatalf("expected resolved range")
+	}
+	if rr.PreparationDuration == nil || *rr.PreparationDuration != 25 {
+		t.Fatalf("expected preparation_duration=25 got %+v", rr.PreparationDuration)
+	}
+	if rr.AftercareDuration == nil || *rr.AftercareDuration != 15 {
+		t.Fatalf("expected aftercare_duration=15 got %+v", rr.AftercareDuration)
+	}
+	if rr.LastShiftAftercareDuration == nil || *rr.LastShiftAftercareDuration != 35 {
+		t.Fatalf("expected last_shift_aftercare_duration=35 got %+v", rr.LastShiftAftercareDuration)
+	}
+}

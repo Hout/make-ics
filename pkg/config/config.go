@@ -115,12 +115,15 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 		if err := checkFirstShiftFields(st.FirstShiftPreparationDuration, st.FirstShiftPreparationTime, loc, lines); err != nil {
 			return fmt.Errorf("config file %q: %s", path, err)
 		}
+		if err := checkLastShiftFields(st.LastShiftAftercareDuration, st.LastShiftAftercareTime, loc, lines); err != nil {
+			return fmt.Errorf("config file %q: %s", path, err)
+		}
 		for si, sched := range st.Schedules {
 			if len(sched.Seasons) == 0 {
 				return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] has no seasons", path, code, si)
 			}
 			if len(sched.Slots) == 0 {
-				return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] has no slots", path, code, si)
+				return fmt.Errorf("config file %q: shift_type.%s.schedules[%d] has no day_schedules", path, code, si)
 			}
 			for _, name := range sched.Seasons {
 				if _, ok := cfg.Seasons[name]; !ok {
@@ -128,8 +131,11 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 				}
 			}
 			for sli, slot := range sched.Slots {
-				slotLoc := fmt.Sprintf("shift_type.%s.schedules[%d].slots[%d]", code, si, sli)
+				slotLoc := fmt.Sprintf("shift_type.%s.schedules[%d].day_schedules[%d]", code, si, sli)
 				if err := checkFirstShiftFields(slot.FirstShiftPreparationDuration, slot.FirstShiftPreparationTime, slotLoc, lines); err != nil {
+					return fmt.Errorf("config file %q: %s", path, err)
+				}
+				if err := checkLastShiftFields(slot.LastShiftAftercareDuration, slot.LastShiftAftercareTime, slotLoc, lines); err != nil {
 					return fmt.Errorf("config file %q: %s", path, err)
 				}
 				for gi, g := range slot.StartTimes {
@@ -152,14 +158,36 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 // is not a valid HH:MM string. When lines is non-nil the offending field's line number
 // is appended to the error message.
 func checkFirstShiftFields(firstAdv *int, firstTime *string, location string, lines LineMap) error {
-	if firstAdv != nil && firstTime != nil {
-		anno := lineAnnotation(location+".first_shift_preparation_time", lines)
-		return fmt.Errorf("%s%s: may not set both first_shift_preparation_duration and first_shift_preparation_time", location, anno)
+	return checkTimedOverrideFields(
+		firstAdv,
+		firstTime,
+		"first_shift_preparation_duration",
+		"first_shift_preparation_time",
+		location,
+		lines,
+	)
+}
+
+func checkLastShiftFields(lastDuration *int, lastTime *string, location string, lines LineMap) error {
+	return checkTimedOverrideFields(
+		lastDuration,
+		lastTime,
+		"last_shift_aftercare_duration",
+		"last_shift_aftercare_time",
+		location,
+		lines,
+	)
+}
+
+func checkTimedOverrideFields(duration *int, clockTime *string, durationField string, timeField string, location string, lines LineMap) error {
+	if duration != nil && clockTime != nil {
+		anno := lineAnnotation(location+"."+timeField, lines)
+		return fmt.Errorf("%s%s: may not set both %s and %s", location, anno, durationField, timeField)
 	}
-	if firstTime != nil {
-		if _, err := time.Parse("15:04", *firstTime); err != nil {
-			anno := lineAnnotation(location+".first_shift_preparation_time", lines)
-			return fmt.Errorf("%s%s: invalid first_shift_preparation_time %q (expected HH:MM)", location, anno, *firstTime)
+	if clockTime != nil {
+		if _, err := time.Parse("15:04", *clockTime); err != nil {
+			anno := lineAnnotation(location+"."+timeField, lines)
+			return fmt.Errorf("%s%s: invalid %s %q (expected HH:MM)", location, anno, timeField, *clockTime)
 		}
 	}
 	return nil

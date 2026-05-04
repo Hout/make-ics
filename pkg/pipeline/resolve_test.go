@@ -170,3 +170,91 @@ func TestResolveRows_SummaryAndDescriptionPrefix(t *testing.T) {
 		t.Errorf("description prefix: want %q got %q", "Route detail\n", resolved[0].description)
 	}
 }
+
+func TestResolveRows_GeneralPreparationDuration_AndFirstShiftOverride(t *testing.T) {
+	prep := 20
+	firstPrep := 45
+	count := 1
+	shifts := map[string]model.ShiftType{"A": {
+		PreparationDuration:           &prep,
+		FirstShiftPreparationDuration: &firstPrep,
+		FirstShiftPreparationCount:    &count,
+	}}
+	rows := []parsedRow{
+		makeRow("A", "2026-04-03", "10:00"),
+		makeRow("A", "2026-04-03", "12:00"),
+	}
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved[0].advance != 45 {
+		t.Errorf("first row advance: want 45 got %d", resolved[0].advance)
+	}
+	if resolved[1].advance != 20 {
+		t.Errorf("second row advance: want 20 got %d", resolved[1].advance)
+	}
+}
+
+func TestResolveRows_GeneralAftercare_AndLastShiftOverrides(t *testing.T) {
+	aftercare := 15
+	lastAftercare := 30
+	shifts := map[string]model.ShiftType{"A": {
+		AftercareDuration:          &aftercare,
+		LastShiftAftercareDuration: &lastAftercare,
+	}}
+	rows := []parsedRow{
+		makeRow("A", "2026-04-03", "10:00"),
+		makeRow("A", "2026-04-03", "12:00"),
+	}
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved[0].remains != 15 {
+		t.Errorf("first row remains: want 15 got %d", resolved[0].remains)
+	}
+	if resolved[0].durationMinutes != defaultAppointmentMinutes+15 {
+		t.Errorf("first row durationMinutes: want %d got %d", defaultAppointmentMinutes+15, resolved[0].durationMinutes)
+	}
+	if resolved[1].remains != 30 {
+		t.Errorf("last row remains: want 30 got %d", resolved[1].remains)
+	}
+	if resolved[1].durationMinutes != defaultAppointmentMinutes+30 {
+		t.Errorf("last row durationMinutes: want %d got %d", defaultAppointmentMinutes+30, resolved[1].durationMinutes)
+	}
+}
+
+func TestResolveRows_LastShiftAftercareTime(t *testing.T) {
+	aftercareTime := "16:30"
+	shifts := map[string]model.ShiftType{"A": {
+		LastShiftAftercareTime: &aftercareTime,
+	}}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "12:00")}
+	var warnings []string
+	resolved, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved[0].remains != 30 {
+		t.Errorf("remains: want 30 got %d", resolved[0].remains)
+	}
+	if resolved[0].durationMinutes != defaultAppointmentMinutes+30 {
+		t.Errorf("durationMinutes: want %d got %d", defaultAppointmentMinutes+30, resolved[0].durationMinutes)
+	}
+}
+
+func TestResolveRows_LastShiftAftercareTime_BeforeComputedEnd_Error(t *testing.T) {
+	aftercareTime := "15:30"
+	shifts := map[string]model.ShiftType{"A": {
+		LastShiftAftercareTime: &aftercareTime,
+	}}
+	rows := []parsedRow{makeRow("A", "2026-04-03", "12:00")}
+	var warnings []string
+	_, err := resolveRows(rows, 10, shifts, nil, nil, nil, make(map[string]bool), &warnings)
+	if err == nil {
+		t.Fatal("expected error when last_shift_aftercare_time is before computed end")
+	}
+}

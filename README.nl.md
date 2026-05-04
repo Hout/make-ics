@@ -52,16 +52,16 @@ shift_type:
     description: "Binnendieze; Historische route Voldersgat"
     trips: 1
     trip_duration: 60
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen]
-        slots:
+        day_schedules:
           - weekdays: ["Sat", "Sun"]
             start_times:
               - times: ["11:15", "13:15", "15:15"]
       - seasons: [hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
             start_times:
               - times: ["11:15", "13:15", "15:15"]
@@ -76,15 +76,20 @@ shift_type:
 | `trips`                            | Aantal ritten per vertrek (standaard 1)                                               |
 | `trip_duration`                    | Duur van elke rit in minuten (standaard 0)                                            |
 | `break_duration`                   | Pauze tussen ritten in minuten (standaard 0)                                          |
-| `first_shift_preparation_duration` | Extra minuten vóór het eerste vertrek van de dag                                      |
-| `first_shift_preparation_time`     | Absolute aankomsttijd (HH:MM) vóór het eerste vertrek                                 |
+| `preparation_duration`             | Extra minuten vóór elk vertrek van de dag                                             |
+| `first_shift_preparation_duration` | Overschrijvende minuten vóór het eerste vertrek/de eerste vertrekken van de dag        |
+| `first_shift_preparation_time`     | Vast kloktijdstip (HH:MM) om te starten vóór het eerste vertrek/de eerste vertrekken   |
 | `first_shift_preparation_count`    | Hoeveel vroege vertrekken per dag de eerste-dienst-aankomsttijd krijgen (standaard 1) |
-| `last_shift_aftercare_duration`    | Extra minuten ná het laatste vertrek van de dag                                       |
+| `aftercare_duration`               | Extra minuten ná elk vertrek van de dag                                               |
+| `last_shift_aftercare_duration`    | Overschrijvende minuten ná het laatste vertrek van de dag                             |
+| `last_shift_aftercare_time`        | Vast kloktijdstip (HH:MM) waarop de laatste dienst, inclusief nazorg, eindigt         |
 | `schedules`                        | Seizoensgebonden roosterlijst (zie hieronder)                                         |
 
 Duurformule: `ritten × ritduur + max(0, ritten − 1) × pauze`
 
 Als zowel `first_shift_preparation_time` als `first_shift_preparation_duration` zijn ingesteld (op verschillende configuratieniveaus), heeft `first_shift_preparation_time` voorrang en wordt er een waarschuwing getoond.
+
+Als zowel `last_shift_aftercare_time` als `last_shift_aftercare_duration` zijn ingesteld (op verschillende configuratieniveaus), heeft `last_shift_aftercare_time` voorrang en wordt er een waarschuwing getoond.
 
 ### Seizoenen en uitzonderingen
 
@@ -92,14 +97,14 @@ Als zowel `first_shift_preparation_time` als `first_shift_preparation_duration` 
 
 `exceptions` koppelen specifieke kalenderdatums aan een andere weekdag voor het zoeken naar het rooster — handig voor feestdagen die een weekendrooster volgen.
 
-### Roosters, slots en begintijden
+### Roosters, dagroosters en begintijden
 
-Elke invoer onder `schedules` geldt wanneer de dienstdatum binnen een van de bijbehorende `seasons` valt. Binnen een rooster beperken `slots` het tot weekdagen:
+Elke invoer onder `schedules` geldt wanneer de dienstdatum binnen een van de bijbehorende `seasons` valt. Binnen een rooster beperken `day_schedules` het tot weekdagen:
 
 ```yaml
 schedules:
   - seasons: [laagseizoen]
-    slots:
+    day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]
         first_shift_preparation_time: "9:15"
         first_shift_preparation_count: 2

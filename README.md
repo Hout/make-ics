@@ -52,16 +52,16 @@ shift_type:
     description: "Binnendieze; Historische route Voldersgat"
     trips: 1
     trip_duration: 60
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen]
-        slots:
+        day_schedules:
           - weekdays: ["Sat", "Sun"]
             start_times:
               - times: ["11:15", "13:15", "15:15"]
       - seasons: [hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
             start_times:
               - times: ["11:15", "13:15", "15:15"]
@@ -76,15 +76,20 @@ shift_type:
 | `trips`                            | Number of trips per departure (default 1)                                       |
 | `trip_duration`                    | Duration of each trip in minutes (default 0)                                    |
 | `break_duration`                   | Break between trips in minutes (default 0)                                      |
-| `first_shift_preparation_duration` | Extra minutes before the first departure of the day                             |
-| `first_shift_preparation_time`     | Absolute clock time (HH:MM) to start before the first departure                 |
+| `preparation_duration`             | Extra minutes before every departure of the day                                 |
+| `first_shift_preparation_duration` | Override minutes before the first departure(s) of the day                       |
+| `first_shift_preparation_time`     | Fixed clock time (HH:MM) to start before the first departure(s)                 |
 | `first_shift_preparation_count`    | How many leading departures per day receive the first-shift advance (default 1) |
-| `last_shift_aftercare_duration`    | Extra minutes added after the last departure of the day                         |
+| `aftercare_duration`               | Extra minutes added after every departure of the day                            |
+| `last_shift_aftercare_duration`    | Override minutes added after the last departure of the day                      |
+| `last_shift_aftercare_time`        | Fixed clock time (HH:MM) when the last shift, including aftercare, ends         |
 | `schedules`                        | Season-based schedule list (see below)                                          |
 
 Duration formula: `trips × trip_duration + max(0, trips − 1) × break_duration`
 
 When both `first_shift_preparation_time` and `first_shift_preparation_duration` are set (at different config levels), `first_shift_preparation_time` takes precedence and a warning is emitted.
+
+When both `last_shift_aftercare_time` and `last_shift_aftercare_duration` are set (at different config levels), `last_shift_aftercare_time` takes precedence and a warning is emitted.
 
 ### Seasons and exceptions
 
@@ -92,14 +97,14 @@ When both `first_shift_preparation_time` and `first_shift_preparation_duration` 
 
 `exceptions` remap specific calendar dates to a different weekday for schedule matching — useful for public holidays that follow a weekend timetable.
 
-### Schedules, slots and start times
+### Schedules, day schedules and start times
 
-Each entry under `schedules` applies when the shift date falls within one of its `seasons`. Inside a schedule, `slots` narrow by weekday:
+Each entry under `schedules` applies when the shift date falls within one of its `seasons`. Inside a schedule, `day_schedules` narrow by weekday:
 
 ```yaml
 schedules:
   - seasons: [laagseizoen]
-    slots:
+    day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]
         first_shift_preparation_time: "9:15"
         first_shift_preparation_count: 2

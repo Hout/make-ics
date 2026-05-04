@@ -50,7 +50,7 @@ shift_type:
       duration: 30
     schedules:
       - seasons: [laagseizoen]
-        slots:
+        day_schedules:
           - weekdays: *wkdays
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
@@ -79,7 +79,7 @@ shift_type:
                   duration: 80
 
       - seasons: [middenseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:20", "10:40", "11:00", "14:00", "14:20", "14:40"]
@@ -95,7 +95,7 @@ shift_type:
                 last_shift_aftercare:
                   duration: 80
       - seasons: [hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times:
@@ -133,7 +133,7 @@ shift_type:
     last_shift_aftercare: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
-        slots:
+        day_schedules:
           - weekdays: *wkdays
             start_times:
               - times: ["13:15", "15:15"]
@@ -141,7 +141,7 @@ shift_type:
             start_times:
               - times: ["11:15", "13:15", "15:15"]
       - seasons: [hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["11:15", "13:15", "15:15"]
@@ -150,11 +150,11 @@ shift_type:
     description: "Binnendieze; Vestingroute Koninginnesteiger"
     trips: 2
     trip_duration: 105
-    first_shift_preparation_duration: 60
-    last_shift_aftercare_duration: 30
+    preparation_duration: 60
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:15", "13:45"]
@@ -163,11 +163,11 @@ shift_type:
     description: "Binnendieze; Jeroen Boschroute Voldersgat"
     trips: 2
     trip_duration: 105
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:15", "13:45"]
@@ -176,16 +176,16 @@ shift_type:
     description: "Binnendieze; Hertogstadroute"
     trips: 1
     trip_duration: 105
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:30", "10:45", "12:50", "13:05"]
       - seasons: [hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:30", "10:45", "12:50", "13:05", "15:10", "15:25"]
@@ -194,11 +194,11 @@ shift_type:
     description: "Binnendieze; Kruithuisroute"
     trips: 2
     trip_duration: 75
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *weekend
             start_times:
               - times: ["12:15"]
@@ -207,11 +207,11 @@ shift_type:
     description: "Binnendieze; Walschipper"
     trips: 1
     trip_duration: 180
-    first_shift_preparation_duration: 30
-    last_shift_aftercare_duration: 30
+    preparation_duration: 30
+    aftercare_duration: 30
     schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
-        slots:
+        day_schedules:
           - weekdays: *no_mon
             start_times:
               - times: ["10:00", "14:00"]

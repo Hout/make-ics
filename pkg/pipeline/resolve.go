@@ -113,6 +113,7 @@ func resolveRows(
 		}
 
 		var advance int
+		generalPreparation := schedule.GetPreparationDuration(shift, rangeEntry)
 		if isFirstShift {
 			switch {
 			case effectiveFirstPrepTime != nil:
@@ -130,20 +131,80 @@ func resolveRows(
 				advance = departureMinutes - firstTimeMinutes
 			case effectiveFirstPrepDuration != nil:
 				advance = *effectiveFirstPrepDuration
+			case generalPreparation != nil:
+				advance = *generalPreparation
 			default:
 				advance = defaultAdvanceMinutes
 			}
+		} else if generalPreparation != nil {
+			advance = *generalPreparation
 		} else {
 			advance = defaultAdvanceMinutes
 		}
 
 		trips := schedule.GetTrips(shift, rangeEntry)
-		durationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultAppointmentMinutes)
-		remains := 0
-		if isLast {
-			remains = schedule.GetLastShiftAftercare(shift, rangeEntry)
+		baseDurationMinutes := schedule.GetShiftDurationMinutes(shift, rangeEntry, trips, defaultAppointmentMinutes)
+		generalAftercare := 0
+		if aftercare := schedule.GetAftercareDuration(shift, rangeEntry); aftercare != nil {
+			generalAftercare = *aftercare
 		}
-		durationMinutes += remains
+
+		var effectiveLastAftercareTime *string
+		var effectiveLastAftercareTimeSrc string
+		var effectiveLastAftercareDuration *int
+		var effectiveLastAftercareDurationSrc string
+		if rangeEntry != nil {
+			if rangeEntry.LastShiftAftercareTime != nil {
+				effectiveLastAftercareTime = rangeEntry.LastShiftAftercareTime
+				effectiveLastAftercareTimeSrc = rangeEntry.LastShiftAftercareTimeSrc
+			}
+			if rangeEntry.LastShiftAftercareDuration != nil {
+				effectiveLastAftercareDuration = rangeEntry.LastShiftAftercareDuration
+				effectiveLastAftercareDurationSrc = rangeEntry.LastShiftAftercareDurationSrc
+			}
+		}
+		if effectiveLastAftercareTime == nil && hasShift && shift.LastShiftAftercareTime != nil {
+			effectiveLastAftercareTime = shift.LastShiftAftercareTime
+			effectiveLastAftercareTimeSrc = ""
+		}
+		if effectiveLastAftercareDuration == nil {
+			if lastAftercare := schedule.GetLastShiftAftercareDuration(shift, rangeEntry); lastAftercare != nil {
+				effectiveLastAftercareDuration = lastAftercare
+				if rangeEntry != nil && rangeEntry.LastShiftAftercareDuration == lastAftercare {
+					effectiveLastAftercareDurationSrc = rangeEntry.LastShiftAftercareDurationSrc
+				}
+			}
+		}
+		if effectiveLastAftercareTime != nil && effectiveLastAftercareDuration != nil && !warnedCrossLevel["last:"+p.Code] {
+			warnedCrossLevel["last:"+p.Code] = true
+			timeInfo := lineForShiftField(p.Code, effectiveLastAftercareTimeSrc, "last_shift_aftercare_time", lines)
+			advInfo := lineForShiftField(p.Code, effectiveLastAftercareDurationSrc, "last_shift_aftercare_duration", lines)
+			msg := fmt.Sprintf("[WARN] shift %s: last_shift_aftercare_time%s and last_shift_aftercare_duration%s set at different levels; last_shift_aftercare_time prevails",
+				p.Code, timeInfo, advInfo)
+			*warnings = append(*warnings, msg)
+		}
+
+		remains := generalAftercare
+		if isLast {
+			switch {
+			case effectiveLastAftercareTime != nil:
+				lt, err := time.Parse("15:04", *effectiveLastAftercareTime)
+				if err != nil {
+					return nil, fmt.Errorf("shift %s: invalid last_shift_aftercare_time %q: %v", p.Code, *effectiveLastAftercareTime, err)
+				}
+				lastTimeMinutes := lt.Hour()*60 + lt.Minute()
+				departureMinutes := p.Hour*60 + p.Min
+				remains = lastTimeMinutes - departureMinutes - baseDurationMinutes
+				if remains < 0 {
+					lineInfo := lineForShiftField(p.Code, effectiveLastAftercareTimeSrc, "last_shift_aftercare_time", lines)
+					return nil, fmt.Errorf("shift %s on %s: last_shift_aftercare_time %q%s is before the computed end of the last shift",
+						p.Code, p.Date.Format("2006-01-02"), *effectiveLastAftercareTime, lineInfo)
+				}
+			case effectiveLastAftercareDuration != nil:
+				remains = *effectiveLastAftercareDuration
+			}
+		}
+		durationMinutes := baseDurationMinutes + remains
 
 		var tripDurVal *int
 		var breakDurVal int
@@ -184,7 +245,7 @@ func resolveRows(
 
 // lineForShiftField returns " (line N)" when lines contains the YAML path for
 // field within the given shift code and source path, otherwise returns "".
-// srcPath is the relative path within the ShiftType (e.g. "schedules[0].slots[1]");
+// srcPath is the relative path within the ShiftType (e.g. "schedules[0].day_schedules[1]");
 // an empty srcPath means the field is at ShiftType level.
 func lineForShiftField(code, srcPath, field string, lines map[string]int) string {
 	if lines == nil {

@@ -5,11 +5,14 @@ import "time"
 // StartTimeGroup is an optional override within a Slot that narrows scheduling
 // parameters to specific departure times.
 type StartTimeGroup struct {
-	Times         []string `yaml:"times,omitempty"`
-	Trips         *int     `yaml:"trips,omitempty"`
-	TripDuration  *int     `yaml:"trip_duration,omitempty"`
-	BreakDuration *int     `yaml:"break_duration,omitempty"`
-	LastAftercare *int     `yaml:"last_shift_aftercare_duration,omitempty"`
+	Times                      []string `yaml:"times,omitempty"`
+	Trips                      *int     `yaml:"trips,omitempty"`
+	TripDuration               *int     `yaml:"trip_duration,omitempty"`
+	BreakDuration              *int     `yaml:"break_duration,omitempty"`
+	PreparationDuration        *int     `yaml:"preparation_duration,omitempty"`
+	AftercareDuration          *int     `yaml:"aftercare_duration,omitempty"`
+	LastShiftAftercareDuration *int     `yaml:"last_shift_aftercare_duration,omitempty"`
+	LastAftercare              *int     `yaml:"-"`
 }
 
 // DateRange is a date window [From, To] inclusive.
@@ -27,17 +30,21 @@ type Slot struct {
 	Trips                         *int             `yaml:"trips,omitempty"`
 	TripDuration                  *int             `yaml:"trip_duration,omitempty"`
 	BreakDuration                 *int             `yaml:"break_duration,omitempty"`
+	PreparationDuration           *int             `yaml:"preparation_duration,omitempty"`
 	FirstShiftPreparationDuration *int             `yaml:"first_shift_preparation_duration,omitempty"`
 	FirstShiftPreparationTime     *string          `yaml:"first_shift_preparation_time,omitempty"`
 	FirstShiftPreparationCount    *int             `yaml:"first_shift_preparation_count,omitempty"`
-	LastAftercare                 *int             `yaml:"last_shift_aftercare_duration,omitempty"`
+	AftercareDuration             *int             `yaml:"aftercare_duration,omitempty"`
+	LastShiftAftercareDuration    *int             `yaml:"last_shift_aftercare_duration,omitempty"`
+	LastShiftAftercareTime        *string          `yaml:"last_shift_aftercare_time,omitempty"`
+	LastAftercare                 *int             `yaml:"-"`
 	StartTimes                    []StartTimeGroup `yaml:"start_times,omitempty"`
 }
 
 // Schedule associates one or more named seasons with a set of weekday Slots.
 type Schedule struct {
 	Seasons []string `yaml:"seasons"`
-	Slots   []Slot   `yaml:"slots,omitempty"`
+	Slots   []Slot   `yaml:"day_schedules,omitempty"`
 }
 
 // ShiftType holds the scheduling parameters for a named shift code.
@@ -47,10 +54,14 @@ type ShiftType struct {
 	Trips                         *int       `yaml:"trips,omitempty"`
 	TripDuration                  *int       `yaml:"trip_duration,omitempty"`
 	BreakDuration                 *int       `yaml:"break_duration,omitempty"`
+	PreparationDuration           *int       `yaml:"preparation_duration,omitempty"`
 	FirstShiftPreparationDuration *int       `yaml:"first_shift_preparation_duration,omitempty"`
 	FirstShiftPreparationTime     *string    `yaml:"first_shift_preparation_time,omitempty"`
 	FirstShiftPreparationCount    *int       `yaml:"first_shift_preparation_count,omitempty"`
-	LastShiftAftercare            *int       `yaml:"last_shift_aftercare_duration,omitempty"`
+	AftercareDuration             *int       `yaml:"aftercare_duration,omitempty"`
+	LastShiftAftercareDuration    *int       `yaml:"last_shift_aftercare_duration,omitempty"`
+	LastShiftAftercareTime        *string    `yaml:"last_shift_aftercare_time,omitempty"`
+	LastShiftAftercare            *int       `yaml:"-"`
 	Schedules                     []Schedule `yaml:"schedules,omitempty"`
 }
 

@@ -15,15 +15,34 @@ import (
 // struct that contributed that field, for line-number annotations in warnings
 // and errors. An empty string means ShiftType level.
 type ResolvedRange struct {
+	PreparationDuration              *int
 	Trips                            *int
 	TripDuration                     *int
 	BreakDuration                    *int
 	FirstShiftPreparationDuration    *int
 	FirstShiftPreparationTime        *string
 	FirstShiftPreparationCount       *int
-	LastAftercare                    *int
+	AftercareDuration                *int
+	LastShiftAftercareDuration       *int
+	LastShiftAftercareTime           *string
 	FirstShiftPreparationDurationSrc string // relative path of struct that set FirstShiftPreparationDuration
 	FirstShiftPreparationTimeSrc     string // relative path of struct that set FirstShiftPreparationTime
+	LastShiftAftercareDurationSrc    string // relative path of struct that set LastShiftAftercareDuration
+	LastShiftAftercareTimeSrc        string // relative path of struct that set LastShiftAftercareTime
+}
+
+func effectiveSlotLastAftercareDuration(slot model.Slot) *int {
+	if slot.LastShiftAftercareDuration != nil {
+		return slot.LastShiftAftercareDuration
+	}
+	return slot.LastAftercare
+}
+
+func effectiveGroupLastAftercareDuration(group model.StartTimeGroup) *int {
+	if group.LastShiftAftercareDuration != nil {
+		return group.LastShiftAftercareDuration
+	}
+	return group.LastAftercare
 }
 
 // containsWeekday reports whether the abbreviation of wd (e.g. "Tue") is present
@@ -91,23 +110,33 @@ func dateInSchedule(date time.Time, sched model.Schedule, seasons map[string]mod
 }
 
 // resolvedFromSlot builds a ResolvedRange populated from the slot-level fields.
-// slotPath is the relative YAML path (e.g. "schedules[0].slots[1]") used for
+// slotPath is the relative YAML path (e.g. "schedules[0].day_schedules[1]") used for
 // line-number annotation of source fields.
 func resolvedFromSlot(slot model.Slot, slotPath string) ResolvedRange {
+	lastAftercareDuration := effectiveSlotLastAftercareDuration(slot)
 	rr := ResolvedRange{
+		PreparationDuration:           slot.PreparationDuration,
 		Trips:                         slot.Trips,
 		TripDuration:                  slot.TripDuration,
 		BreakDuration:                 slot.BreakDuration,
 		FirstShiftPreparationDuration: slot.FirstShiftPreparationDuration,
 		FirstShiftPreparationTime:     slot.FirstShiftPreparationTime,
 		FirstShiftPreparationCount:    slot.FirstShiftPreparationCount,
-		LastAftercare:                 slot.LastAftercare,
+		AftercareDuration:             slot.AftercareDuration,
+		LastShiftAftercareDuration:    lastAftercareDuration,
+		LastShiftAftercareTime:        slot.LastShiftAftercareTime,
 	}
 	if slot.FirstShiftPreparationDuration != nil {
 		rr.FirstShiftPreparationDurationSrc = slotPath
 	}
 	if slot.FirstShiftPreparationTime != nil {
 		rr.FirstShiftPreparationTimeSrc = slotPath
+	}
+	if lastAftercareDuration != nil {
+		rr.LastShiftAftercareDurationSrc = slotPath
+	}
+	if slot.LastShiftAftercareTime != nil {
+		rr.LastShiftAftercareTimeSrc = slotPath
 	}
 	return rr
 }
@@ -169,12 +198,13 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 			if len(slot.Weekdays) > 0 && !containsWeekday(slot.Weekdays, effectiveWeekday) {
 				continue
 			}
-			slotPath := fmt.Sprintf("schedules[%d].slots[%d]", si, sli)
+			slotPath := fmt.Sprintf("schedules[%d].day_schedules[%d]", si, sli)
 			if startTime != "" {
-				for _, g := range slot.StartTimes {
+				for gi, g := range slot.StartTimes {
 					for _, tm := range g.Times {
 						if strings.TrimSpace(tm) == strings.TrimSpace(startTime) {
 							rr := resolvedFromSlot(slot, slotPath)
+							groupPath := fmt.Sprintf("%s.start_times[%d]", slotPath, gi)
 							if g.Trips != nil {
 								rr.Trips = g.Trips
 							}
@@ -184,8 +214,15 @@ func FindSchedule(schedules []model.Schedule, apptDate time.Time, startTime stri
 							if g.BreakDuration != nil {
 								rr.BreakDuration = g.BreakDuration
 							}
-							if g.LastAftercare != nil {
-								rr.LastAftercare = g.LastAftercare
+							if g.PreparationDuration != nil {
+								rr.PreparationDuration = g.PreparationDuration
+							}
+							if g.AftercareDuration != nil {
+								rr.AftercareDuration = g.AftercareDuration
+							}
+							if lastAftercareDuration := effectiveGroupLastAftercareDuration(g); lastAftercareDuration != nil {
+								rr.LastShiftAftercareDuration = lastAftercareDuration
+								rr.LastShiftAftercareDurationSrc = groupPath
 							}
 							return &rr
 						}

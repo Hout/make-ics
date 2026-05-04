@@ -27,6 +27,49 @@ func GetTrips(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
 	return nil
 }
 
+// GetPreparationDuration returns the effective general preparation duration for
+// all shifts, with rangeEntry taking precedence over the shift setting.
+func GetPreparationDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && rangeEntry.PreparationDuration != nil {
+		return rangeEntry.PreparationDuration
+	}
+	return shift.PreparationDuration
+}
+
+// GetAftercareDuration returns the effective general aftercare duration for all
+// shifts, with rangeEntry taking precedence over the shift setting.
+func GetAftercareDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && rangeEntry.AftercareDuration != nil {
+		return rangeEntry.AftercareDuration
+	}
+	return shift.AftercareDuration
+}
+
+func shiftLastAftercareDuration(shift model.ShiftType) *int {
+	if shift.LastShiftAftercareDuration != nil {
+		return shift.LastShiftAftercareDuration
+	}
+	return shift.LastShiftAftercare
+}
+
+// GetLastShiftAftercareDuration returns the last-shift-specific aftercare
+// duration override, with rangeEntry taking precedence over shift settings.
+func GetLastShiftAftercareDuration(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *int {
+	if rangeEntry != nil && rangeEntry.LastShiftAftercareDuration != nil {
+		return rangeEntry.LastShiftAftercareDuration
+	}
+	return shiftLastAftercareDuration(shift)
+}
+
+// GetLastShiftAftercareTime returns the last-shift-specific fixed end time for
+// aftercare, with rangeEntry taking precedence over the shift setting.
+func GetLastShiftAftercareTime(shift model.ShiftType, rangeEntry *dr.ResolvedRange) *string {
+	if rangeEntry != nil && rangeEntry.LastShiftAftercareTime != nil {
+		return rangeEntry.LastShiftAftercareTime
+	}
+	return shift.LastShiftAftercareTime
+}
+
 // GetShiftDurationMinutes returns the total shift duration in minutes using the
 // formula trips×tripDuration + max(0,trips−1)×breakDuration. Falls back to
 // defaultMinutes when trips or tripDuration are not configured.
@@ -62,11 +105,8 @@ func GetShiftDurationMinutes(shift model.ShiftType, rangeEntry *dr.ResolvedRange
 // GetLastShiftAftercare returns the extra minutes appended to the last shift of
 // a (code, date) group, with rangeEntry taking precedence over the shift setting.
 func GetLastShiftAftercare(shift model.ShiftType, rangeEntry *dr.ResolvedRange) int {
-	if rangeEntry != nil && rangeEntry.LastAftercare != nil {
-		return *rangeEntry.LastAftercare
-	}
-	if shift.LastShiftAftercare != nil {
-		return *shift.LastShiftAftercare
+	if aftercare := GetLastShiftAftercareDuration(shift, rangeEntry); aftercare != nil {
+		return *aftercare
 	}
 	return 0
 }
