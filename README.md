@@ -50,46 +50,40 @@ shift_type:
   HRv_:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
-    trips: 1
-    trip_duration: 60
-    preparation_duration: 30
-    aftercare_duration: 30
     season_schedules:
       - seasons: [laagseizoen]
         day_schedules:
           - weekdays: ["Sat", "Sun"]
-            start_times:
-              - times: ["11:15", "13:15", "15:15"]
+            shifts:
+              "1": { trips: ["13:15"], arrive: "12:45", leave: "14:15" }
+              "2": { trips: ["15:15"], arrive: "14:45", leave: "16:15" }
       - seasons: [hoogseizoen]
         day_schedules:
           - weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            start_times:
-              - times: ["11:15", "13:15", "15:15"]
+            shifts:
+              "1": { trips: ["11:15"], arrive: "10:45", leave: "12:15" }
+              "2": { trips: ["13:15"], arrive: "12:45", leave: "14:15" }
+              "3": { trips: ["15:15"], arrive: "14:45", leave: "16:15" }
 ```
 
 ### Shift type fields
 
-| Field                              | Description                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| `summary`                          | VEVENT `SUMMARY` (calendar title)                                               |
-| `description`                      | Static text appended to the event description                                   |
-| `trips`                            | Number of trips per departure (default 1)                                       |
-| `trip_duration`                    | Duration of each trip in minutes (default 0)                                    |
-| `break_duration`                   | Break between trips in minutes (default 0)                                      |
-| `preparation_duration`             | Extra minutes before every departure of the day                                 |
-| `first_shift_preparation_duration` | Override minutes before the first departure(s) of the day                       |
-| `first_shift_preparation_time`     | Fixed clock time (HH:MM) to start before the first departure(s)                 |
-| `first_shift_preparation_count`    | How many leading departures per day receive the first-shift advance (default 1) |
-| `aftercare_duration`               | Extra minutes added after every departure of the day                            |
-| `last_shift_aftercare_duration`    | Override minutes added after the last departure of the day                      |
-| `last_shift_aftercare_time`        | Fixed clock time (HH:MM) when the last shift, including aftercare, ends         |
-| `schedules`                        | Season-based schedule list (see below)                                          |
+| Field              | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `summary`          | VEVENT `SUMMARY` (calendar title)              |
+| `description`      | Static text appended to the event description  |
+| `season_schedules` | Season-based schedule list (see below)         |
 
-Duration formula: `trips × trip_duration + max(0, trips − 1) × break_duration`
+### Shift fields
 
-When both `first_shift_preparation_time` and `first_shift_preparation_duration` are set (at different config levels), `first_shift_preparation_time` takes precedence and a warning is emitted.
+Each entry in a `shifts` map defines the calendar event for one shift number as it appears in the xlsx:
 
-When both `last_shift_aftercare_time` and `last_shift_aftercare_duration` are set (at different config levels), `last_shift_aftercare_time` takes precedence and a warning is emitted.
+| Field        | Description                                                                            |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `trips`      | List of departure times (`HH:MM`) — one per trip                                       |
+| `trip_times` | Alternative to `trips`: list of `{start: "HH:MM", duration: <minutes>}` structs        |
+| `arrive`     | Fixed clock time (HH:MM) the event starts; defaults to first departure − advance time  |
+| `leave`      | Fixed clock time (HH:MM) the event ends; required for single-trip, or computed from last trip end for multi-trip |
 
 ### Seasons and exceptions
 
@@ -97,7 +91,7 @@ When both `last_shift_aftercare_time` and `last_shift_aftercare_duration` are se
 
 `exceptions` remap specific calendar dates to a different weekday for schedule matching — useful for public holidays that follow a weekend timetable.
 
-### Schedules, day schedules and start times
+### Schedules, day schedules and shifts
 
 Each entry under `season_schedules` applies when the shift date falls within one of its `seasons`. Inside a schedule, `day_schedules` narrow by weekday:
 
@@ -106,15 +100,18 @@ season_schedules:
   - seasons: [laagseizoen]
     day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]
-        first_shift_preparation_time: "9:15"
-        first_shift_preparation_count: 2
-        start_times:
-          - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
-          - times: ["14:40", "15:00"]
-            trips: 2 # override trips for these start times only
+        shifts:
+          "1":
+            trips: ["10:20", "11:40", "13:00"]
+            arrive: "09:15"
+            leave: "14:20"
+          "2":
+            trips: ["10:40", "12:00", "13:20"]
+            arrive: "09:15"
+            leave: "15:00"
 ```
 
-`start_times` groups departure times that share the same trip parameters. Any field omitted inside a group inherits from the enclosing slot, then the shift type.
+`shifts` maps shift numbers (as they appear in the xlsx) to event definitions. `arrive` and `leave` set the calendar event boundaries. `leave` is required for single-trip shifts; for multi-trip shifts it can be omitted and is computed from the last trip's end time (requires explicit `trip_times` with a `duration`).
 
 ## Web interface
 

@@ -50,46 +50,40 @@ shift_type:
   HRv_:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
-    trips: 1
-    trip_duration: 60
-    preparation_duration: 30
-    aftercare_duration: 30
     season_schedules:
       - seasons: [laagseizoen]
         day_schedules:
           - weekdays: ["Sat", "Sun"]
-            start_times:
-              - times: ["11:15", "13:15", "15:15"]
+            shifts:
+              "1": { trips: ["13:15"], arrive: "12:45", leave: "14:15" }
+              "2": { trips: ["15:15"], arrive: "14:45", leave: "16:15" }
       - seasons: [hoogseizoen]
         day_schedules:
           - weekdays: ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            start_times:
-              - times: ["11:15", "13:15", "15:15"]
+            shifts:
+              "1": { trips: ["11:15"], arrive: "10:45", leave: "12:15" }
+              "2": { trips: ["13:15"], arrive: "12:45", leave: "14:15" }
+              "3": { trips: ["15:15"], arrive: "14:45", leave: "16:15" }
 ```
 
 ### Velden per dienstsoort
 
-| Veld                               | Omschrijving                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------- |
-| `summary`                          | VEVENT `SUMMARY` (calendertitel)                                                      |
-| `description`                      | Vaste tekst toegevoegd aan de beschrijving                                            |
-| `trips`                            | Aantal ritten per vertrek (standaard 1)                                               |
-| `trip_duration`                    | Duur van elke rit in minuten (standaard 0)                                            |
-| `break_duration`                   | Pauze tussen ritten in minuten (standaard 0)                                          |
-| `preparation_duration`             | Extra minuten vóór elk vertrek van de dag                                             |
-| `first_shift_preparation_duration` | Overschrijvende minuten vóór het eerste vertrek/de eerste vertrekken van de dag        |
-| `first_shift_preparation_time`     | Vast kloktijdstip (HH:MM) om te starten vóór het eerste vertrek/de eerste vertrekken   |
-| `first_shift_preparation_count`    | Hoeveel vroege vertrekken per dag de eerste-dienst-aankomsttijd krijgen (standaard 1) |
-| `aftercare_duration`               | Extra minuten ná elk vertrek van de dag                                               |
-| `last_shift_aftercare_duration`    | Overschrijvende minuten ná het laatste vertrek van de dag                             |
-| `last_shift_aftercare_time`        | Vast kloktijdstip (HH:MM) waarop de laatste dienst, inclusief nazorg, eindigt         |
-| `schedules`                        | Seizoensgebonden roosterlijst (zie hieronder)                                         |
+| Veld               | Omschrijving                                              |
+| ------------------ | --------------------------------------------------------- |
+| `summary`          | VEVENT `SUMMARY` (calendertitel)                          |
+| `description`      | Vaste tekst toegevoegd aan de beschrijving                |
+| `season_schedules` | Seizoensgebonden roosterlijst (zie hieronder)             |
 
-Duurformule: `ritten × ritduur + max(0, ritten − 1) × pauze`
+### Dienstvelden
 
-Als zowel `first_shift_preparation_time` als `first_shift_preparation_duration` zijn ingesteld (op verschillende configuratieniveaus), heeft `first_shift_preparation_time` voorrang en wordt er een waarschuwing getoond.
+Elke invoer in een `shifts`-map beschrijft het kalenderevenement voor één dienstnummer zoals dat in de xlsx verschijnt:
 
-Als zowel `last_shift_aftercare_time` als `last_shift_aftercare_duration` zijn ingesteld (op verschillende configuratieniveaus), heeft `last_shift_aftercare_time` voorrang en wordt er een waarschuwing getoond.
+| Veld         | Omschrijving                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------- |
+| `trips`      | Lijst van vertrektijden (`HH:MM`) — één per rit                                                       |
+| `trip_times` | Alternatief voor `trips`: lijst van `{start: "HH:MM", duration: <minuten>}`-structuren               |
+| `arrive`     | Vaste kloktijd (HH:MM) waarop het evenement begint; standaard eerste vertrek − aankomsttijd           |
+| `leave`      | Vaste kloktijd (HH:MM) waarop het evenement eindigt; verplicht bij één rit, of berekend uit de laatste rit bij meerdere ritten |
 
 ### Seizoenen en uitzonderingen
 
@@ -97,7 +91,7 @@ Als zowel `last_shift_aftercare_time` als `last_shift_aftercare_duration` zijn i
 
 `exceptions` koppelen specifieke kalenderdatums aan een andere weekdag voor het zoeken naar het rooster — handig voor feestdagen die een weekendrooster volgen.
 
-### Roosters, dagroosters en begintijden
+### Roosters, dagroosters en diensten
 
 Elke invoer onder `season_schedules` geldt wanneer de dienstdatum binnen een van de bijbehorende `seasons` valt. Binnen een rooster beperken `day_schedules` het tot weekdagen:
 
@@ -106,15 +100,18 @@ season_schedules:
   - seasons: [laagseizoen]
     day_schedules:
       - weekdays: ["Tue", "Wed", "Thu", "Fri"]
-        first_shift_preparation_time: "9:15"
-        first_shift_preparation_count: 2
-        start_times:
-          - times: ["10:20", "10:40", "11:00", "14:00", "14:20"]
-          - times: ["14:40", "15:00"]
-            trips: 2 # overschrijft trips voor deze begintijden
+        shifts:
+          "1":
+            trips: ["10:20", "11:40", "13:00"]
+            arrive: "09:15"
+            leave: "14:20"
+          "2":
+            trips: ["10:40", "12:00", "13:20"]
+            arrive: "09:15"
+            leave: "15:00"
 ```
 
-`start_times` groepeert vertrektijden die dezelfde ritparameters delen. Ontbrekende velden in een groep worden overgenomen van het slot, daarna van de dienstsoort.
+`shifts` koppelt dienstnummers (zoals ze in de xlsx staan) aan evenementdefinities. `arrive` en `leave` bepalen de grenzen van het kalenderevenement. `leave` is verplicht bij enkelvoudige ritten; bij meerdere ritten kan het worden weggelaten en wordt het berekend uit het eindtijdstip van de laatste rit (vereist expliciete `trip_times` met een `duration`).
 
 ## Webinterface
 
