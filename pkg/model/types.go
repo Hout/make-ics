@@ -107,6 +107,7 @@ type Schedule struct {
 type ShiftType struct {
 	Summary     string     `yaml:"summary,omitempty"`
 	Description string     `yaml:"description,omitempty"`
+	Aliases     []string   `yaml:"aliases,omitempty"`
 	Trips       *int       `yaml:"trips,omitempty"`
 	Schedules   []Schedule `yaml:"season_schedules,omitempty"`
 }

@@ -219,3 +219,62 @@ func TestValidateConfig_ValidShiftTripTimes(t *testing.T) {
 		t.Fatalf("unexpected error for valid shifts trip_times: %v", err)
 	}
 }
+
+func TestValidateConfig_AliasDuplicatesShiftKey(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"HRM": {Aliases: []string{"HRM"}, Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots:   []model.Slot{{Shifts: map[string]model.Shift{"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}}}}},
+			}}},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for alias duplicating shift key")
+	}
+}
+
+func TestValidateConfig_AliasDuplicatesAnotherShiftKey(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	baseSchedule := []model.Schedule{{
+		Seasons: []string{"s"},
+		Slots:   []model.Slot{{Shifts: map[string]model.Shift{"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}}}}},
+	}}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"HRM": {Aliases: []string{"HRV"}, Schedules: baseSchedule},
+			"HRV": {Schedules: baseSchedule},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatalf("expected error for alias duplicating another shift key")
+	}
+}
+
+func TestValidateConfig_ValidAliases(t *testing.T) {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	cfg := model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"HRM": {
+				Aliases: []string{"HRm_"},
+				Schedules: []model.Schedule{{
+					Seasons: []string{"s"},
+					Slots:   []model.Slot{{Shifts: map[string]model.Shift{"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}}}}},
+				}},
+			},
+		},
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("unexpected error for valid aliases: %v", err)
+	}
+}

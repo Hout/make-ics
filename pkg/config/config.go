@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -112,6 +113,9 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 	if _, err := time.LoadLocation(cfg.Timezone); err != nil {
 		return fmt.Errorf("config file %q has invalid timezone: %q", path, cfg.Timezone)
 	}
+	if err := validateShiftAliases(cfg.ShiftType, lines); err != nil {
+		return fmt.Errorf("config file %q: %s", path, err)
+	}
 	for code, st := range cfg.ShiftType {
 		for si, sched := range st.Schedules {
 			if len(sched.Seasons) == 0 {
@@ -144,6 +148,33 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 					}
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func validateShiftAliases(shiftTypes map[string]model.ShiftType, lines LineMap) error {
+	seen := make(map[string]string)
+	for code := range shiftTypes {
+		seen[code] = fmt.Sprintf("shift_type.%s", code)
+	}
+	for code, st := range shiftTypes {
+		for i, alias := range st.Aliases {
+			aliasPath := fmt.Sprintf("shift_type.%s.aliases[%d]", code, i)
+			trimmed := strings.TrimSpace(alias)
+			if trimmed == "" {
+				anno := lineAnnotation(aliasPath, lines)
+				return fmt.Errorf("%s%s: alias must not be empty", aliasPath, anno)
+			}
+			if prev, ok := seen[trimmed]; ok && prev != fmt.Sprintf("shift_type.%s", code) {
+				anno := lineAnnotation(aliasPath, lines)
+				return fmt.Errorf("%s%s: alias %q duplicates %s", aliasPath, anno, trimmed, prev)
+			}
+			if prev, ok := seen[trimmed]; ok && prev == fmt.Sprintf("shift_type.%s", code) {
+				anno := lineAnnotation(aliasPath, lines)
+				return fmt.Errorf("%s%s: alias %q duplicates the shift key", aliasPath, anno, trimmed)
+			}
+			seen[trimmed] = aliasPath
 		}
 	}
 	return nil

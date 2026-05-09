@@ -2,12 +2,38 @@ package pipeline
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/model"
 	dr "github.com/jeroen/make-ics-go/pkg/range"
 	"github.com/jeroen/make-ics-go/pkg/schedule"
 )
+
+func buildShiftAliasLookup(shiftTypes map[string]model.ShiftType) map[string]string {
+	aliases := make(map[string]string)
+	for code, shift := range shiftTypes {
+		for _, alias := range shift.Aliases {
+			trimmed := strings.TrimSpace(alias)
+			if trimmed == "" {
+				continue
+			}
+			aliases[trimmed] = code
+		}
+	}
+	return aliases
+}
+
+func lookupShiftType(shiftTypes map[string]model.ShiftType, aliases map[string]string, code string) (model.ShiftType, bool) {
+	if shift, ok := shiftTypes[code]; ok {
+		return shift, true
+	}
+	if canonical, ok := aliases[code]; ok {
+		shift, ok := shiftTypes[canonical]
+		return shift, ok
+	}
+	return model.ShiftType{}, false
+}
 
 const defaultAppointmentMinutes = 240 // 4 h fallback when no trip data is configured
 
@@ -33,8 +59,9 @@ func resolveRows(
 	warnings *[]string,
 ) ([]resolvedRow, error) {
 	resolved := make([]resolvedRow, 0, len(parsed))
+	aliasLookup := buildShiftAliasLookup(shiftTypes)
 	for _, p := range parsed {
-		shift, hasShift := shiftTypes[p.Code]
+		shift, hasShift := lookupShiftType(shiftTypes, aliasLookup, p.Code)
 		startTime := fmt.Sprintf("%02d:%02d", p.Hour, p.Min)
 		eff := dr.EffectiveWeekday(p.Date, exceptions)
 		rangeEntry := dr.FindSchedule(shift.Schedules, p.Date, startTime, eff, seasons)

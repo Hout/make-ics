@@ -37,9 +37,10 @@ _weekdays:
   mon: &mon ["Mon"]
 
 shift_type:
-  HRm_:
+  HRM:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
+    aliases: ["HRm_"]
     trips: 3
     season_schedules:
       - seasons: [laagseizoen]
@@ -47,75 +48,83 @@ shift_type:
           - weekdays: *wkdays
             shifts:
               "1":
+                { trips: ["11:20", "12:40"], arrive: "10:50", leave: "13:45" }
+              "2":
                 {
                   trips: ["10:20", "11:40", "13:00"],
                   arrive: "09:15",
-                  leave: "14:20",
-                }
-              "2":
-                {
-                  trips: ["10:40", "12:00", "13:20"],
-                  arrive: "09:15",
-                  leave: "15:00",
+                  leave: "14:05",
                 }
               "3":
                 {
-                  trips: ["11:00", "12:20", "13:40"],
-                  arrive: "10:30",
-                  leave: "15:00",
+                  trips: ["10:40", "12:00", "13:20"],
+                  arrive: "09:15",
+                  leave: "14:25",
                 }
               "4":
+                {
+                  trips: ["11:00", "12:20", "13:40"],
+                  arrive: "10:30",
+                  leave: "14:45",
+                }
+              "5":
                 {
                   trips: ["14:00", "15:20", "16:40"],
                   arrive: "13:30",
                   leave: "18:00",
                 }
-              "5":
+              "6":
                 {
                   trips: ["14:20", "15:40", "17:00"],
                   arrive: "13:50",
                   leave: "18:20",
                 }
-              "6":
-                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
               "7":
+                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
+              "8":
                 { trips: ["15:00", "16:20"], arrive: "14:30", leave: "17:40" }
 
           - weekdays: *weekend
             shifts:
               "1":
+                { trips: ["11:20", "12:40"], arrive: "10:50", leave: "13:45" }
+              "2":
                 {
                   trips: ["10:20", "11:40", "13:00"],
                   arrive: "09:15",
                   leave: "14:20",
                 }
-              "2":
+              "3":
                 {
                   trips: ["10:40", "12:00", "13:20"],
                   arrive: "09:15",
-                  leave: "15:00",
+                  leave: "14:25",
                 }
-              "3":
+              "4":
                 {
                   trips: ["11:00", "12:20", "13:40"],
                   arrive: "10:30",
-                  leave: "15:00",
+                  leave: "14:45",
                 }
-              "4":
+              "5":
                 {
                   trips: ["14:00", "15:20", "16:40"],
                   arrive: "13:30",
                   leave: "18:00",
                 }
-              "5":
+              "6":
                 {
                   trips: ["14:20", "15:40", "17:00"],
                   arrive: "13:50",
                   leave: "18:20",
                 }
-              "6":
-                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
               "7":
+                {
+                  trips: ["14:40", "16:00", "17:20"],
+                  arrive: "14:10",
+                  leave: "18:40",
+                }
+              "8":
                 { trips: ["15:00", "16:20"], arrive: "14:30", leave: "17:40" }
 
           - weekdays: *mon
@@ -142,38 +151,44 @@ shift_type:
           - weekdays: *no_mon
             shifts:
               "1":
+                { trips: ["11:20", "12:40"], arrive: "10:50", leave: "13:45" }
+              "2":
                 {
                   trips: ["10:20", "11:40", "13:00"],
                   arrive: "09:15",
-                  leave: "14:20",
-                }
-              "2":
-                {
-                  trips: ["10:40", "12:00", "13:20"],
-                  arrive: "09:15",
-                  leave: "15:00",
+                  leave: "14:05",
                 }
               "3":
                 {
-                  trips: ["11:00", "12:20", "13:40"],
-                  arrive: "10:30",
-                  leave: "15:00",
+                  trips: ["10:40", "12:00", "13:20"],
+                  arrive: "09:15",
+                  leave: "14:25",
                 }
               "4":
+                {
+                  trips: ["11:00", "12:20", "13:40"],
+                  arrive: "10:30",
+                  leave: "14:45",
+                }
+              "5":
                 {
                   trips: ["14:00", "15:20", "16:40"],
                   arrive: "13:30",
                   leave: "18:00",
                 }
-              "5":
+              "6":
                 {
                   trips: ["14:20", "15:40", "17:00"],
                   arrive: "13:50",
                   leave: "18:20",
                 }
-              "6":
-                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
               "7":
+                {
+                  trips: ["14:40", "16:00", "17:20"],
+                  arrive: "14:10",
+                  leave: "18:40",
+                }
+              "8":
                 { trips: ["15:00", "16:20"], arrive: "14:30", leave: "17:40" }
           - weekdays: *mon
             shifts:
@@ -190,7 +205,11 @@ shift_type:
                   leave: "18:20",
                 }
               "3":
-                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
+                {
+                  trips: ["14:40", "16:00", "17:20"],
+                  arrive: "14:10",
+                  leave: "18:40",
+                }
               "4":
                 { trips: ["15:00", "16:20"], arrive: "14:30", leave: "17:40" }
       - seasons: [hoogseizoen]
@@ -201,25 +220,25 @@ shift_type:
                 {
                   trips: ["10:00", "11:20", "12:40"],
                   arrive: "09:15",
-                  leave: "14:00",
+                  leave: "13:45",
                 }
               "2":
                 {
                   trips: ["10:20", "11:40", "13:00"],
                   arrive: "09:15",
-                  leave: "14:20",
+                  leave: "14:05",
                 }
               "3":
                 {
                   trips: ["10:40", "12:00", "13:20"],
                   arrive: "10:30",
-                  leave: "15:00",
+                  leave: "14:25",
                 }
               "4":
                 {
                   trips: ["11:00", "12:20", "13:40"],
                   arrive: "10:30",
-                  leave: "15:00",
+                  leave: "14:45",
                 }
               "5":
                 {
@@ -234,9 +253,13 @@ shift_type:
                   leave: "18:20",
                 }
               "7":
-                { trips: ["14:40", "16:00"], arrive: "14:10", leave: "17:20" }
+                {
+                  trips: ["14:40", "16:00", "17:20"],
+                  arrive: "14:10",
+                  leave: "18:40",
+                }
               "8":
-                { trips: ["15:00", "16:20"], arrive: "14:30", leave: "17:40" }
+                { trips: ["15:00", "16:20"], arrive: "14:30", leave: "18:40" }
           - weekdays: *fri_sat
             shifts:
               "1": { trips: ["19:00"], arrive: "18:30", leave: "20:00" }
@@ -244,11 +267,12 @@ shift_type:
             shifts:
               "1": { trips: ["14:00", "15:20", "16:40"], leave: "18:00" }
               "2": { trips: ["14:20", "15:40", "17:00"], leave: "18:20" }
-              "3": { trips: ["14:40", "16:00"], leave: "17:20" }
-              "4": { trips: ["15:00", "16:20"], leave: "17:40" }
-  HRv_:
+              "3": { trips: ["14:40", "16:00", "17:20"], leave: "18:40" }
+              "4": { trips: ["15:00", "16:20"], leave: "18:40" }
+  HRV:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
+    aliases: ["HRv_"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen]
@@ -256,82 +280,92 @@ shift_type:
           - weekdays: *wkdays
             shifts:
               "1":
-                { trips: ["13:15", "14:35"], arrive: "09:15", leave: "15:55" }
-              "2": { trips: ["15:15", "16:35"], leave: "17:55" }
+                { trips: ["13:15", "14:15"], arrive: "12:15", leave: "15:55" }
+              "2": { trips: ["15:15", "16:15"], leave: "17:55" }
           - weekdays: *weekend
             shifts:
               "1":
-                { trips: ["11:15", "12:35"], arrive: "09:15", leave: "13:55" }
-              "2": { trips: ["13:15", "14:35"], leave: "15:55" }
-              "3": { trips: ["15:15", "16:35"], leave: "17:55" }
+                { trips: ["11:15", "12:15"], arrive: "10:15", leave: "13:55" }
+              "2": { trips: ["13:15", "14:15"], leave: "15:55" }
+              "3": { trips: ["15:15", "16:15"], leave: "17:55" }
       - seasons: [hoogseizoen]
         day_schedules:
           - weekdays: *no_mon
             shifts:
               "1":
-                { trips: ["11:15", "12:35"], arrive: "09:15", leave: "13:55" }
+                { trips: ["11:15", "12:15"], arrive: "10:15", leave: "13:55" }
               "2":
-                { trips: ["13:15", "14:35"], arrive: "12:45", leave: "15:55" }
+                { trips: ["13:15", "14:15"], arrive: "12:45", leave: "15:55" }
               "3":
-                { trips: ["15:15", "16:35"], arrive: "14:45", leave: "17:55" }
-  VRk_:
+                { trips: ["15:15", "16:15"], arrive: "14:45", leave: "17:55" }
+  VRK:
     summary: "Binnendieze VRK"
     description: "Binnendieze; Vestingroute Koninginnesteiger"
+    aliases: ["VRk_"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         day_schedules:
           - weekdays: *no_mon
             shifts:
-              "1": { trips: ["10:15", "12:00"], arrive: "09:15", leave: "13:45" }
-              "2": { trips: ["13:45", "15:30"], arrive: "13:15", leave: "17:15" }
-  JBRv:
-    summary: "Binnendieze JBRV"
+              "1":
+                { trips: ["10:15", "12:00"], arrive: "09:15", leave: "13:45" }
+              "2":
+                { trips: ["13:45", "15:30"], arrive: "13:15", leave: "17:15" }
+  JBV:
+    summary: "Binnendieze JBV"
     description: "Binnendieze; Jeroen Boschroute Voldersgat"
+    aliases: ["JBRv"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         day_schedules:
           - weekdays: *no_mon
             shifts:
-              "1": { trips: ["10:15", "12:00"], arrive: "09:15", leave: "13:45" }
-              "2": { trips: ["13:45", "15:30"], arrive: "13:15", leave: "17:15" }
-  HTS_:
+              "1":
+                { trips: ["10:15", "12:00"], arrive: "09:15", leave: "13:45" }
+              "2":
+                { trips: ["13:45", "15:30"], arrive: "13:15", leave: "17:15" }
+  HTS:
     summary: "Binnendieze HTS"
     description: "Binnendieze; Hertogstadroute"
+    aliases: ["HTS_"]
     trips: 1
     season_schedules:
       - seasons: [laagseizoen, middenseizoen]
         day_schedules:
           - weekdays: *no_mon
             shifts:
-              "1": { trips: ["10:30"], arrive: "09:30",  leave: "11:30" }
-              "2": { trips: ["10:45"], arrive: "09:45", leave: "11:45" }
-              "3": { trips: ["12:50"], arrive: "11:50", leave: "13:50" }
-              "4": { trips: ["13:05"], arrive: "12:05", leave: "14:05" }
+              "1": { trips: ["10:30"], arrive: "10:00", leave: "12:15" }
+              "2": { trips: ["10:45"], arrive: "10:00", leave: "12:30" }
+              "3": { trips: ["12:50"], arrive: "12:20", leave: "14:35" }
+              "4": { trips: ["13:05"], arrive: "12:35", leave: "14:50" }
       - seasons: [hoogseizoen]
         day_schedules:
           - weekdays: *no_mon
             shifts:
-              "1": { trips: ["10:30"], arrive: "09:30", leave: "11:30" }
-              "2": { trips: ["10:45"], arrive: "09:45", leave: "11:45" }
-              "3": { trips: ["12:50"], arrive: "11:50", leave: "13:50" }
-              "4": { trips: ["13:05"], arrive: "12:05", leave: "14:05" }
-              "5": { trips: ["15:10"], arrive: "14:10", leave: "16:10" }
-              "6": { trips: ["15:25"], arrive: "14:25", leave: "16:25" }
-  KHR_:
-    summary: "Binnendieze KHR"
+              "1": { trips: ["10:30"], arrive: "10:00", leave: "12:15" }
+              "2": { trips: ["10:45"], arrive: "10:00", leave: "12:30" }
+              "3": { trips: ["12:50"], arrive: "12:20", leave: "14:35" }
+              "4": { trips: ["13:05"], arrive: "12:35", leave: "14:50" }
+              "5": { trips: ["15:10"], arrive: "14:40", leave: "16:55" }
+              "6": { trips: ["15:25"], arrive: "14:55", leave: "17:10" }
+  KRB:
+    summary: "Binnendieze KRB"
     description: "Binnendieze; Kruithuisroute"
+    aliases: ["KHR_"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
         day_schedules:
           - weekdays: *weekend
             shifts:
-              "1": { trips: ["12:15", "13:30"], arrive: "11:15", leave: "14:45" }
-  WS__:
+              "1":
+                { trips: ["12:15", "13:30"], arrive: "11:15", leave: "14:45" }
+  WS:
     summary: "Binnendieze WS"
     description: "Binnendieze; Walschipper"
+    aliases: ["WS__"]
     trips: 1
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]

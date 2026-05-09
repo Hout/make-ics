@@ -63,6 +63,70 @@ func TestIterEvents_CodeTrimsWhitespace(t *testing.T) {
 	}
 }
 
+func TestIterEvents_LegacyCodeAliasMatchesConfiguredShift(t *testing.T) {
+	f := excelize.NewFile()
+	s := f.GetSheetName(0)
+	f.SetCellValue(s, "A1", "05-mei-26")
+	f.SetCellValue(s, "B1", "HRm_")
+	f.SetCellValue(s, "C1", "11:20 uur")
+
+	leave := "13:45"
+	arrive := "10:50"
+	shifts := map[string]model.ShiftType{
+		"HRM": {
+			Summary:     "Binnendieze HRM",
+			Description: "Binnendieze; Historische route Molenstraat",
+			Aliases:     []string{"HRm_"},
+			Schedules: []model.Schedule{{
+				Seasons: []string{"mid"},
+				Slots: []model.Slot{{
+					Weekdays: []string{"Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+					Shifts: map[string]model.Shift{
+						"1": {
+							TripTimes: []model.TripTime{{Start: "11:20"}, {Start: "12:40"}},
+							Arrive:    &arrive,
+							Leave:     &leave,
+						},
+					},
+				}},
+			}},
+		},
+	}
+	seasons := map[string]model.Season{
+		"mid": {{
+			From: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC),
+			To:   time.Date(2026, 6, 28, 0, 0, 0, 0, time.UTC),
+		}},
+	}
+
+	loc, _ := i18n.NewLocalizer("en")
+	events, _, err := IterEvents(f, 30, "Europe/Amsterdam", shifts, seasons, nil, nil, loc)
+	if err != nil {
+		t.Fatalf("IterEvents error: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event got %d", len(events))
+	}
+	e := events[0]
+	if e.Summary != "Binnendieze HRM" {
+		t.Fatalf("expected summary %q got %q", "Binnendieze HRM", e.Summary)
+	}
+	if !bytes.Contains([]byte(e.Description), []byte("Historische route Molenstraat")) {
+		t.Fatalf("expected full route description, got %q", e.Description)
+	}
+	if !bytes.Contains([]byte(e.Description), []byte("11:20")) || !bytes.Contains([]byte(e.Description), []byte("12:40")) {
+		t.Fatalf("expected trip times in description, got %q", e.Description)
+	}
+	wantStart := time.Date(2026, 5, 5, 10, 50, 0, 0, e.DtStart.Location())
+	wantEnd := time.Date(2026, 5, 5, 13, 45, 0, 0, e.DtEnd.Location())
+	if !e.DtStart.Equal(wantStart) {
+		t.Fatalf("DtStart want %v got %v", wantStart, e.DtStart)
+	}
+	if !e.DtEnd.Equal(wantEnd) {
+		t.Fatalf("DtEnd want %v got %v", wantEnd, e.DtEnd)
+	}
+}
+
 func TestIterEvents_SkipsNonDataRows(t *testing.T) {
 	f := excelize.NewFile()
 	sheet := f.GetSheetName(0)

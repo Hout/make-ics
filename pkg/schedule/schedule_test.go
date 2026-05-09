@@ -57,7 +57,7 @@ func TestBuildProgramFromTripTimes_English(t *testing.T) {
 		t.Fatalf("expected non-empty program")
 	}
 	// Should contain preparation, trip 1, trip 2, aftercare
-	want := "09:50 - Preparation\n10:20 - Trip 1\n11:10 - Break 1\n11:40 - Trip 2\n12:30 - aftercare → 12:50"
+	want := "09:50 - Preparation\n10:20 - Trip 1\n11:10 - Break 1\n11:40 - Trip 2\naftercare → 12:50"
 	if got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}

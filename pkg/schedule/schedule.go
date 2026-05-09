@@ -99,7 +99,7 @@ func BuildProgramFromTripTimes(tripTimes []model.TripTime, advance int, remains 
 		if t != nil {
 			afterLabel = t.T("aftercare → {time}", map[string]any{"time": endStr})
 		}
-		lines = append(lines, formatTimeLine(fmt.Sprintf("%02d:%02d", afterBase.Hour(), afterBase.Minute()), afterLabel, t))
+		lines = append(lines, afterLabel)
 	}
 
 	return strings.Join(lines, "\n")
