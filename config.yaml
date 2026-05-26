@@ -40,7 +40,7 @@ shift_type:
   HRM:
     summary: "Binnendieze HRM"
     description: "Binnendieze; Historische route Molenstraat"
-    aliases: ["HRm_"]
+    aliases: ["HRm_", "HRm"]
     trips: 3
     season_schedules:
       - seasons: [laagseizoen]
@@ -272,7 +272,7 @@ shift_type:
   HRV:
     summary: "Binnendieze HRV"
     description: "Binnendieze; Historische route Voldersgat"
-    aliases: ["HRv_"]
+    aliases: ["HRv_", "HRv"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen]
@@ -301,7 +301,7 @@ shift_type:
   VRK:
     summary: "Binnendieze VRK"
     description: "Binnendieze; Vestingroute Koninginnesteiger"
-    aliases: ["VRk_"]
+    aliases: ["VRk_", "VRk"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
@@ -315,7 +315,7 @@ shift_type:
   JBV:
     summary: "Binnendieze JBV"
     description: "Binnendieze; Jeroen Boschroute Voldersgat"
-    aliases: ["JBRv"]
+    aliases: ["JBRv_", "JBv", "JBv_"]
     trips: 2
     season_schedules:
       - seasons: [laagseizoen, middenseizoen, hoogseizoen]
@@ -326,10 +326,34 @@ shift_type:
                 { trips: ["10:15", "12:00"], arrive: "09:15", leave: "13:45" }
               "2":
                 { trips: ["13:45", "15:30"], arrive: "13:15", leave: "17:15" }
-  HTS:
+  HTSmo:
     summary: "Binnendieze HTS"
-    description: "Binnendieze; Hertogstadroute"
-    aliases: ["HTS_"]
+    description: "Binnendieze; Hertogstadroute Molenstraat"
+    aliases: []
+    trips: 1
+    season_schedules:
+      - seasons: [laagseizoen, middenseizoen]
+        day_schedules:
+          - weekdays: *no_mon
+            shifts:
+              "1": { trips: ["10:30"], arrive: "10:00", leave: "12:15" }
+              "2": { trips: ["10:45"], arrive: "10:00", leave: "12:30" }
+              "3": { trips: ["12:50"], arrive: "12:20", leave: "14:35" }
+              "4": { trips: ["13:05"], arrive: "12:35", leave: "14:50" }
+      - seasons: [hoogseizoen]
+        day_schedules:
+          - weekdays: *no_mon
+            shifts:
+              "1": { trips: ["10:30"], arrive: "10:00", leave: "12:15" }
+              "2": { trips: ["10:45"], arrive: "10:00", leave: "12:30" }
+              "3": { trips: ["12:50"], arrive: "12:20", leave: "14:35" }
+              "4": { trips: ["13:05"], arrive: "12:35", leave: "14:50" }
+              "5": { trips: ["15:10"], arrive: "14:40", leave: "16:55" }
+              "6": { trips: ["15:25"], arrive: "14:55", leave: "17:10" }
+  HTSbo:
+    summary: "Binnendieze HTS"
+    description: "Binnendieze; Hertogstadroute Bolwerk"
+    aliases: []
     trips: 1
     season_schedules:
       - seasons: [laagseizoen, middenseizoen]
