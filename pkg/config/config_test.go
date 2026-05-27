@@ -278,3 +278,69 @@ func TestValidateConfig_ValidAliases(t *testing.T) {
 		t.Fatalf("unexpected error for valid aliases: %v", err)
 	}
 }
+
+func baseConfig() model.Config {
+	from := model.DateRange{From: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)}
+	return model.Config{
+		Timezone: "Europe/Amsterdam",
+		Locale:   "nl_NL",
+		Seasons:  map[string]model.Season{"s": {from}},
+		ShiftType: map[string]model.ShiftType{
+			"HRM": {Schedules: []model.Schedule{{
+				Seasons: []string{"s"},
+				Slots:   []model.Slot{{Shifts: map[string]model.Shift{"1": {TripTimes: []model.TripTime{{Start: "10:00", Duration: 50}}}}}},
+			}}},
+		},
+	}
+}
+
+func TestValidateCalDAV_Absent(t *testing.T) {
+	cfg := baseConfig()
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("empty caldav block should be fine: %v", err)
+	}
+}
+
+func TestValidateCalDAV_Valid(t *testing.T) {
+	cfg := baseConfig()
+	cfg.CalDAV = model.CalDAVConfig{
+		URL:                 "https://caldav.icloud.com",
+		UsernameEnv:         "CALDAV_USERNAME",
+		PasswordEnv:         "CALDAV_PASSWORD",
+		CalendarDisplayName: "Jeroen (Laura)",
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err != nil {
+		t.Fatalf("unexpected error for valid caldav config: %v", err)
+	}
+}
+
+func TestValidateCalDAV_MissingURL(t *testing.T) {
+	cfg := baseConfig()
+	cfg.CalDAV = model.CalDAVConfig{
+		UsernameEnv:         "CALDAV_USERNAME",
+		PasswordEnv:         "CALDAV_PASSWORD",
+		CalendarDisplayName: "Jeroen (Laura)",
+	}
+	if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+		t.Fatal("expected error for missing caldav.url")
+	}
+}
+
+func TestValidateCalDAV_MissingEnvNames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  model.CalDAVConfig
+	}{
+		{"missing username_env", model.CalDAVConfig{URL: "https://caldav.icloud.com", PasswordEnv: "CALDAV_PASSWORD", CalendarDisplayName: "Cal"}},
+		{"missing password_env", model.CalDAVConfig{URL: "https://caldav.icloud.com", UsernameEnv: "CALDAV_USERNAME", CalendarDisplayName: "Cal"}},
+		{"missing calendar_display_name", model.CalDAVConfig{URL: "https://caldav.icloud.com", UsernameEnv: "CALDAV_USERNAME", PasswordEnv: "CALDAV_PASSWORD"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := baseConfig()
+			cfg.CalDAV = tc.cfg
+			if err := ValidateConfig(cfg, "cfg.yaml", nil); err == nil {
+				t.Fatalf("expected error for %s", tc.name)
+			}
+		})
+	}
+}

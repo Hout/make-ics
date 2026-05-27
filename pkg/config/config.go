@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -116,6 +117,9 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 	if err := validateShiftAliases(cfg.ShiftType, lines); err != nil {
 		return fmt.Errorf("config file %q: %s", path, err)
 	}
+	if err := validateCalDAV(cfg.CalDAV, path); err != nil {
+		return err
+	}
 	for code, st := range cfg.ShiftType {
 		for si, sched := range st.Schedules {
 			if len(sched.Seasons) == 0 {
@@ -149,6 +153,29 @@ func ValidateConfig(cfg model.Config, path string, lines LineMap) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func validateCalDAV(cfg model.CalDAVConfig, path string) error {
+	// The caldav block is optional; skip validation when absent.
+	if cfg.URL == "" && cfg.UsernameEnv == "" && cfg.PasswordEnv == "" && cfg.CalendarDisplayName == "" {
+		return nil
+	}
+	if cfg.URL == "" {
+		return fmt.Errorf("config file %q: caldav.url is required", path)
+	}
+	if _, err := url.Parse(cfg.URL); err != nil {
+		return fmt.Errorf("config file %q: caldav.url is not a valid URL: %w", path, err)
+	}
+	if cfg.UsernameEnv == "" {
+		return fmt.Errorf("config file %q: caldav.username_env is required", path)
+	}
+	if cfg.PasswordEnv == "" {
+		return fmt.Errorf("config file %q: caldav.password_env is required", path)
+	}
+	if cfg.CalendarDisplayName == "" {
+		return fmt.Errorf("config file %q: caldav.calendar_display_name is required", path)
 	}
 	return nil
 }

@@ -119,6 +119,16 @@ type Exception struct {
 	Weekday     string `yaml:"weekday"`
 }
 
+// CalDAVConfig holds the CalDAV sync settings.
+// Credentials are read from environment variables at sync time; only their
+// names are stored here so secrets never appear in config.yaml.
+type CalDAVConfig struct {
+	URL                 string `yaml:"url"`
+	UsernameEnv         string `yaml:"username_env"`
+	PasswordEnv         string `yaml:"password_env"`
+	CalendarDisplayName string `yaml:"calendar_display_name"`
+}
+
 // Config is the top-level structure of config.yaml.
 type Config struct {
 	Timezone   string               `yaml:"timezone"`
@@ -126,4 +136,5 @@ type Config struct {
 	Exceptions map[string]Exception `yaml:"exceptions,omitempty"`
 	Seasons    map[string]Season    `yaml:"seasons,omitempty"`
 	ShiftType  map[string]ShiftType `yaml:"shift_type"`
+	CalDAV     CalDAVConfig         `yaml:"caldav,omitempty"`
 }

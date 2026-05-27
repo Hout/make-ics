@@ -8,7 +8,8 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(go doc *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git *)"
     ]
   }
 }

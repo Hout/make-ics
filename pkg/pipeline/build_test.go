@@ -108,6 +108,29 @@ func TestBuildEvents_TimezoneApplied(t *testing.T) {
 	}
 }
 
+func TestBuildEvents_DeterministicUID(t *testing.T) {
+	loc := mustLocalizer("en")
+	tz, _ := time.LoadLocation("Europe/Amsterdam")
+	r := makeResolved(30, 120, nil, 0)
+
+	first := buildEvents([]resolvedRow{r}, tz, loc)
+	second := buildEvents([]resolvedRow{r}, tz, loc)
+	if first[0].UID == "" {
+		t.Fatalf("UID is empty")
+	}
+	if first[0].UID != second[0].UID {
+		t.Errorf("UID not stable across calls: %q vs %q", first[0].UID, second[0].UID)
+	}
+
+	// A different shift code on the same date+time must produce a different UID.
+	r2 := r
+	r2.parsed.Code = "B"
+	other := buildEvents([]resolvedRow{r2}, tz, loc)
+	if other[0].UID == first[0].UID {
+		t.Errorf("expected different UID for different code, both = %q", first[0].UID)
+	}
+}
+
 func TestBuildEvents_WithExplicitTripTimes(t *testing.T) {
 	loc := mustLocalizer("en")
 	tz, _ := time.LoadLocation("Europe/Amsterdam")

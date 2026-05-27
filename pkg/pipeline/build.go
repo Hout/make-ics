@@ -10,6 +10,15 @@ import (
 	"github.com/jeroen/make-ics-go/pkg/schedule"
 )
 
+// eventUID is a deterministic UUIDv5 derived from (date, shift code, start
+// time). The same shift on the same date always yields the same UID, so
+// downstream CalDAV sync can recognise and update an existing event instead
+// of creating a duplicate.
+func eventUID(date time.Time, code string, hour, min int) string {
+	key := fmt.Sprintf("%s|%s|%02d:%02d", date.Format("2006-01-02"), code, hour, min)
+	return uuid.NewSHA1(makeICSNamespace, []byte(key)).String()
+}
+
 func buildEvents(resolved []resolvedRow, locTZ *time.Location, loc *i18n.Localizer) []Event {
 	events := make([]Event, 0, len(resolved))
 	for _, r := range resolved {
@@ -38,7 +47,7 @@ func buildEvents(resolved []resolvedRow, locTZ *time.Location, loc *i18n.Localiz
 			Description: description,
 			DtStart:     dtStart,
 			DtEnd:       dtEnd,
-			UID:         uuid.NewString(),
+			UID:         eventUID(p.Date, p.Code, p.Hour, p.Min),
 		})
 	}
 	return events

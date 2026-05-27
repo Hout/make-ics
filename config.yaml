@@ -2,6 +2,16 @@
 timezone: Europe/Amsterdam
 locale: nl_NL
 
+# CalDAV sync settings. Credentials are supplied via environment variables at
+# runtime so no secrets live in this file.
+#   export CALDAV_USERNAME='you@icloud.com'
+#   export CALDAV_PASSWORD='app-specific-password'   # iCloud app-specific password
+caldav:
+  url: https://caldav.icloud.com
+  username_env: CALDAV_USERNAME
+  password_env: CALDAV_PASSWORD
+  calendar_display_name: "Jeroen (Laura)"
+
 # Exceptions: dates treated as a different weekday for schedule matching.
 exceptions:
   2026-04-06:
