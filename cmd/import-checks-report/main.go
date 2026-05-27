@@ -27,7 +27,7 @@ func main() {
 // Run executes the command using the provided args (excluding program name).
 // It returns an error instead of calling os.Exit so tests can call it safely.
 func Run(args []string) error {
-	fs := flag.NewFlagSet("make-ics", flag.ContinueOnError)
+	fs := flag.NewFlagSet("import-checks-report", flag.ContinueOnError)
 	input := fs.String("input", "report.xlsx", "Path to the input xlsx file")
 	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
 	// -c is an alias for -config; both write to the same pointer so the last one wins.

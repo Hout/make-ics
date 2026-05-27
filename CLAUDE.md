@@ -16,10 +16,10 @@ go test ./...                            # run all tests
 go test ./pkg/pipeline/...              # run a single package's tests
 go vet ./...                             # static analysis (must be clean)
 go build ./...                           # build all packages
-go run ./cmd/make-ics report.xlsx        # smoke-test CLI
-go run ./cmd/web                         # start web server on :8080
-go build -o make-ics-macos ./cmd/make-ics
-GOOS=windows GOARCH=amd64 go build -o make-ics.exe ./cmd/make-ics
+go run ./cmd/import-checks-report report.xlsx   # smoke-test CLI
+go run ./cmd/web                                # start web server on :8080
+go build -o import-checks-report-macos ./cmd/import-checks-report
+GOOS=windows GOARCH=amd64 go build -o import-checks-report.exe ./cmd/import-checks-report
 ```
 
 Pre-commit hooks run `go build`, `go vet`, and `go test` automatically. Install once after cloning:
@@ -36,7 +36,7 @@ Data flow: `xlsx` → `pipeline.IterEvents` → `[]pipeline.Event` → `ics.Writ
 
 | Package               | Responsibility                                                                                                                                                                         |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd/make-ics`        | CLI entry point; `Run` is testable, `main` delegates                                                                                                                                   |
+| `cmd/import-checks-report` | CLI entry point; `Run` is testable, `main` delegates                                                                                                                             |
 | `cmd/web`             | HTTP server; multipart upload → ICS download, all in memory                                                                                                                            |
 | `cmd/list-shifts`     | Debug tool that lists parsed shifts                                                                                                                                                    |
 | `internal/defaultcfg` | Embeds `config.yaml` into the binary                                                                                                                                                   |
@@ -88,5 +88,5 @@ Data flow: `xlsx` → `pipeline.IterEvents` → `[]pipeline.Event` → `ics.Writ
 1. `go build ./...` — must succeed
 2. `go vet ./...` — must be clean
 3. `go test ./...` — all must pass
-4. `go run ./cmd/make-ics report.xlsx` — verify output
+4. `go run ./cmd/import-checks-report report.xlsx` — verify output
 5. Commit (pre-commit hooks re-run steps 1–3)
