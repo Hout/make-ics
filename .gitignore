@@ -21,3 +21,4 @@ __pycache__/
 # project files
 test.md
 krv_docs/
+.env
