@@ -97,22 +97,74 @@ func TestMakePlan_IncludePast(t *testing.T) {
 	}
 }
 
-// PastManagedOnRemote: a past event already on the server should NOT be
-// deleted when IncludePast=false. Deletion only happens within the sync window.
-func TestMakePlan_PastRemoteNotDeleted(t *testing.T) {
-	// Remote has a past event; we're syncing future-only. Since the past event
-	// is not included in active events, it never enters the desired map and
-	// won't appear in the remote query either (window starts in the future).
-	// makePlan receives only events that passed the past filter, so the past
-	// remote entry would not be present in `remote` at all.
-	// This test validates the boundary at the plan level: a remote entry not
-	// in desired → delete. Since past events are excluded before ListManaged is
-	// called, they never appear in `remote`.
-	remote := map[string]remoteEntry{} // ListManaged returns nothing for past window
-	events := []pipeline.Event{futureEvent("f")}
-	plan := makePlan(remote, events, anchor, SyncOptions{IncludePast: false})
-	if len(plan.toDelete) != 0 {
-		t.Errorf("toDelete=%d want 0 (past remote outside window)", len(plan.toDelete))
+func TestMakePlan_PastEventsSkipped(t *testing.T) {
+	events := []pipeline.Event{futureEvent("f"), pastEvent("p")}
+	plan := makePlan(nil, events, anchor, SyncOptions{IncludePast: false})
+	if plan.skipped != 1 {
+		t.Errorf("skipped=%d want 1", plan.skipped)
+	}
+	if len(plan.toAdd) != 1 || plan.toAdd[0].UID != "f" {
+		t.Errorf("expected only future event in toAdd")
+	}
+}
+
+func TestSortSyncPlanChronological(t *testing.T) {
+	late := futureEvent("late")
+	late.DtStart = anchor.Add(4 * time.Hour)
+	late.DtEnd = anchor.Add(5 * time.Hour)
+
+	early := futureEvent("early")
+	early.DtStart = anchor.Add(1 * time.Hour)
+	early.DtEnd = anchor.Add(2 * time.Hour)
+
+	mid := futureEvent("mid")
+	mid.DtStart = anchor.Add(2 * time.Hour)
+	mid.DtEnd = anchor.Add(3 * time.Hour)
+
+	plan := syncPlan{
+		toAdd: []pipeline.Event{late, early, mid},
+		toUpdate: []updateEntry{
+			{event: late, href: "/cal/late.ics"},
+			{event: early, href: "/cal/early.ics"},
+			{event: mid, href: "/cal/mid.ics"},
+		},
+		toDelete: []remoteEntry{
+			{href: "/cal/late.ics", start: late.DtStart, end: late.DtEnd},
+			{href: "/cal/early.ics", start: early.DtStart, end: early.DtEnd},
+			{href: "/cal/mid.ics", start: mid.DtStart, end: mid.DtEnd},
+		},
+	}
+
+	sortSyncPlanChronological(&plan)
+
+	if got := plan.toAdd[0].UID; got != "early" {
+		t.Fatalf("toAdd[0] = %q, want %q", got, "early")
+	}
+	if got := plan.toAdd[1].UID; got != "mid" {
+		t.Fatalf("toAdd[1] = %q, want %q", got, "mid")
+	}
+	if got := plan.toAdd[2].UID; got != "late" {
+		t.Fatalf("toAdd[2] = %q, want %q", got, "late")
+	}
+
+	if got := plan.toUpdate[0].event.UID; got != "early" {
+		t.Fatalf("toUpdate[0] = %q, want %q", got, "early")
+	}
+	if got := plan.toUpdate[1].event.UID; got != "mid" {
+		t.Fatalf("toUpdate[1] = %q, want %q", got, "mid")
+	}
+	if got := plan.toUpdate[2].event.UID; got != "late" {
+		t.Fatalf("toUpdate[2] = %q, want %q", got, "late")
+	}
+
+	if got := plan.toDelete[0].href; got != "/cal/early.ics" {
+		t.Fatalf("toDelete[0] = %q, want %q", got, "/cal/early.ics")
+	}
+	if got := plan.toDelete[1].href; got != "/cal/mid.ics" {
+		t.Fatalf("toDelete[1] = %q, want %q", got, "/cal/mid.ics")
+	}
+	if got := plan.toDelete[2].href; got != "/cal/late.ics" {
+		t.Fatalf("toDelete[2] = %q, want %q", got, "/cal/late.ics")
 	}
 }
 
@@ -334,6 +386,146 @@ func TestSync_IncludePast(t *testing.T) {
 	}
 }
 
+func TestSync_PeriodFilter(t *testing.T) {
+	backend := newFakeBackend()
+	client, ts := newTestClient(t, backend)
+	defer ts.Close()
+
+	early := futureEvent("early")
+	early.DtStart = time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	early.DtEnd = time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+
+	late := futureEvent("late")
+	late.DtStart = time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
+	late.DtEnd = time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+
+	opts := SyncOptions{
+		IncludePast: true,
+		Start:       time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+		End:         time.Date(2026, 6, 30, 23, 59, 59, 0, time.UTC),
+		Year:        2026,
+	}
+
+	res, err := client.Sync(context.Background(), []pipeline.Event{early, late}, opts)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if res.Added != 1 || res.Skipped != 0 {
+		t.Errorf("period filter: %+v", res)
+	}
+	if len(backend.puts) != 1 {
+		t.Fatalf("want 1 PUT, got %d", len(backend.puts))
+	}
+	if got := backend.puts[0]; !strings.Contains(got, "early") {
+		t.Fatalf("unexpected PUT path %q, want early event", got)
+	}
+}
+
+func TestSync_DoesNotDeleteStaleMovedEventOutsideWindow(t *testing.T) {
+	backend := newFakeBackend()
+	client, ts := newTestClient(t, backend)
+	defer ts.Close()
+
+	oldEvent := futureEvent("ev1")
+	oldEvent.DtStart = time.Date(2026, 6, 16, 10, 0, 0, 0, time.UTC)
+	oldEvent.DtEnd = time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	if _, err := client.Sync(context.Background(), []pipeline.Event{oldEvent}, SyncOptions{IncludePast: true, Year: 2026}); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	backend.deletes = nil
+
+	newEvent := oldEvent
+	newEvent.UID = "ev2"
+	newEvent.DtStart = time.Date(2026, 8, 20, 10, 0, 0, 0, time.UTC)
+	newEvent.DtEnd = time.Date(2026, 8, 20, 12, 0, 0, 0, time.UTC)
+
+	res, err := client.Sync(context.Background(), []pipeline.Event{newEvent}, SyncOptions{
+		IncludePast: true,
+		Start:       time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		End:         time.Date(2026, 8, 31, 23, 59, 59, 0, time.UTC),
+		Year:        2026,
+	})
+	if err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+	if res.Added != 1 || res.Deleted != 0 {
+		t.Fatalf("want add=1 delete=0, got %+v", res)
+	}
+	if len(backend.deletes) != 0 {
+		t.Fatalf("want 0 DELETE, got %d", len(backend.deletes))
+	}
+}
+
+func TestSync_SkippingPastDoesNotDeletePastManagedEvents(t *testing.T) {
+	backend := newFakeBackend()
+	client, ts := newTestClient(t, backend)
+	defer ts.Close()
+
+	past := futureEvent("past")
+	past.DtStart = anchor.Add(-72 * time.Hour)
+	past.DtEnd = anchor.Add(-70 * time.Hour)
+
+	if _, err := client.Sync(context.Background(), []pipeline.Event{past}, SyncOptions{IncludePast: true, Year: past.DtStart.Year(), Now: anchor}); err != nil {
+		t.Fatalf("seed Sync: %v", err)
+	}
+
+	backend.deletes = nil
+
+	future := futureEvent("future")
+	res, err := client.Sync(context.Background(), []pipeline.Event{future}, SyncOptions{IncludePast: false, Year: future.DtStart.Year(), Now: anchor})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if res.Deleted != 0 {
+		t.Fatalf("want delete=0, got %+v", res)
+	}
+	if res.ExcludedFromDeletionScope != 1 {
+		t.Fatalf("want excluded_from_deletion_scope=1, got %+v", res)
+	}
+	if len(backend.deletes) != 0 {
+		t.Fatalf("want 0 DELETE, got %d", len(backend.deletes))
+	}
+	if _, ok := backend.objects[fakeCalPath+"past.ics"]; !ok {
+		t.Fatalf("past managed event should remain on server")
+	}
+}
+
+func TestSync_DeletesStaleFutureManagedEventsWhenSkippingPast(t *testing.T) {
+	backend := newFakeBackend()
+	client, ts := newTestClient(t, backend)
+	defer ts.Close()
+
+	oldFuture := futureEvent("future-old")
+	oldFuture.DtStart = anchor.Add(24 * time.Hour)
+	oldFuture.DtEnd = anchor.Add(26 * time.Hour)
+
+	if _, err := client.Sync(context.Background(), []pipeline.Event{oldFuture}, SyncOptions{IncludePast: true, Year: oldFuture.DtStart.Year(), Now: anchor}); err != nil {
+		t.Fatalf("seed Sync: %v", err)
+	}
+
+	backend.deletes = nil
+
+	newFuture := futureEvent("future-new")
+	newFuture.DtStart = anchor.Add(48 * time.Hour)
+	newFuture.DtEnd = anchor.Add(50 * time.Hour)
+
+	res, err := client.Sync(context.Background(), []pipeline.Event{newFuture}, SyncOptions{IncludePast: false, Year: newFuture.DtStart.Year(), Now: anchor})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if res.Deleted != 1 {
+		t.Fatalf("want delete=1, got %+v", res)
+	}
+	if res.ExcludedFromDeletionScope != 0 {
+		t.Fatalf("want excluded_from_deletion_scope=0, got %+v", res)
+	}
+	if len(backend.deletes) != 1 {
+		t.Fatalf("want 1 DELETE, got %d", len(backend.deletes))
+	}
+}
+
 func TestSync_UserCreatedEventUntouched(t *testing.T) {
 	backend := newFakeBackend()
 
@@ -386,5 +578,96 @@ func TestSync_DryRun_NoPuts(t *testing.T) {
 	}
 	if len(backend.puts) != 0 {
 		t.Errorf("dry-run issued %d PUTs, want 0", len(backend.puts))
+	}
+}
+
+func TestSync_ActionLogs(t *testing.T) {
+	backend := newFakeBackend()
+	client, ts := newTestClient(t, backend)
+	defer ts.Close()
+	var logs []string
+	logf := func(format string, a ...any) {
+		logs = append(logs, fmt.Sprintf(format, a...))
+	}
+
+	addEvent := futureEvent("ev1")
+	logs = nil
+	_, err := client.Sync(context.Background(), []pipeline.Event{addEvent}, SyncOptions{IncludePast: true, Logf: logf})
+	if err != nil {
+		t.Fatalf("sync add: %v", err)
+	}
+	addLogs := strings.Join(logs, "\n")
+	if len(logs) == 0 || !strings.Contains(addLogs, "wrote appointment summary=") {
+		t.Fatalf("expected write log, got %v", logs)
+	}
+	if strings.Contains(addLogs, "uid=") {
+		t.Fatalf("expected no uid in logs, got %v", logs)
+	}
+	if !strings.Contains(addLogs, "start=") || !strings.Contains(addLogs, "end=") {
+		t.Fatalf("expected start/end in logs, got %v", logs)
+	}
+
+	updated := addEvent
+	updated.Summary = "Updated"
+	updated.Description = "Updated description"
+	updated.DtStart = updated.DtStart.Add(26 * time.Hour)
+	updated.DtEnd = updated.DtEnd.Add(26 * time.Hour)
+	logs = nil
+	_, err = client.Sync(context.Background(), []pipeline.Event{updated}, SyncOptions{IncludePast: true, Logf: logf})
+	if err != nil {
+		t.Fatalf("sync update: %v", err)
+	}
+	updateLogs := strings.Join(logs, "\n")
+	if len(logs) == 0 || !strings.Contains(updateLogs, "changed appointment changes=") {
+		t.Fatalf("expected change log, got %v", logs)
+	}
+	if !strings.Contains(updateLogs, "changes=") {
+		t.Fatalf("expected metadata change summary in logs, got %v", logs)
+	}
+	if !strings.Contains(updateLogs, "changes_json=") {
+		t.Fatalf("expected metadata change json in logs, got %v", logs)
+	}
+	if !strings.Contains(updateLogs, `"field":"title"`) || !strings.Contains(updateLogs, `"field":"description"`) || !strings.Contains(updateLogs, `"field":"date"`) || !strings.Contains(updateLogs, `"field":"time"`) {
+		t.Fatalf("expected title/description/date/time JSON changes in logs, got %v", logs)
+	}
+	if !strings.Contains(updateLogs, "title:") || !strings.Contains(updateLogs, "description:") || !strings.Contains(updateLogs, "date:") || !strings.Contains(updateLogs, "time:") {
+		t.Fatalf("expected title/description/date/time changes in logs, got %v", logs)
+	}
+	if strings.Contains(updateLogs, "uid=") {
+		t.Fatalf("expected no uid in logs, got %v", logs)
+	}
+	if !strings.Contains(updateLogs, "start=") || !strings.Contains(updateLogs, "end=") {
+		t.Fatalf("expected start/end in logs, got %v", logs)
+	}
+
+	dryRunUpdated := updated
+	dryRunUpdated.Summary = "Updated dry-run"
+	logs = nil
+	_, err = client.Sync(context.Background(), []pipeline.Event{dryRunUpdated}, SyncOptions{IncludePast: true, DryRun: true, Logf: logf})
+	if err != nil {
+		t.Fatalf("sync dry-run update: %v", err)
+	}
+	dryRunLogs := strings.Join(logs, "\n")
+	if !strings.Contains(dryRunLogs, "would change appointment") {
+		t.Fatalf("expected dry-run change log, got %v", logs)
+	}
+	if !strings.Contains(dryRunLogs, "changes_json=") {
+		t.Fatalf("expected dry-run metadata change json in logs, got %v", logs)
+	}
+
+	logs = nil
+	_, err = client.Sync(context.Background(), []pipeline.Event{futureEvent("ev2")}, SyncOptions{IncludePast: true, Logf: logf})
+	if err != nil {
+		t.Fatalf("sync delete: %v", err)
+	}
+	deleteLogs := strings.Join(logs, "\n")
+	if len(logs) == 0 || !strings.Contains(deleteLogs, "deleted appointment") {
+		t.Fatalf("expected delete log, got %v", logs)
+	}
+	if strings.Contains(deleteLogs, "uid=") {
+		t.Fatalf("expected no uid in logs, got %v", logs)
+	}
+	if !strings.Contains(deleteLogs, "start=") || !strings.Contains(deleteLogs, "end=") {
+		t.Fatalf("expected start/end in logs, got %v", logs)
 	}
 }

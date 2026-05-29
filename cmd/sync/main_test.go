@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jeroen/make-ics-go/pkg/model"
 )
@@ -49,8 +50,18 @@ func TestLoadDotEnv_DoesNotOverrideExistingEnv(t *testing.T) {
 		t.Fatalf("write .env: %v", err)
 	}
 
-	if err := loadDotEnv(path); err != nil {
+	stats, err := loadDotEnv(path)
+	if err != nil {
 		t.Fatalf("loadDotEnv: %v", err)
+	}
+	if !stats.Found {
+		t.Fatal("stats.Found = false, want true")
+	}
+	if stats.Loaded != 1 {
+		t.Fatalf("stats.Loaded = %d, want 1", stats.Loaded)
+	}
+	if stats.Skipped != 1 {
+		t.Fatalf("stats.Skipped = %d, want 1", stats.Skipped)
 	}
 
 	if got := os.Getenv("ID"); got != "existing-user" {
@@ -58,6 +69,19 @@ func TestLoadDotEnv_DoesNotOverrideExistingEnv(t *testing.T) {
 	}
 	if got := os.Getenv("PASSWORD"); got != "file-pass" {
 		t.Fatalf("PASSWORD = %q, want %q", got, "file-pass")
+	}
+}
+
+func TestLoadDotEnv_MissingFile(t *testing.T) {
+	stats, err := loadDotEnv(filepath.Join(t.TempDir(), ".env"))
+	if err != nil {
+		t.Fatalf("loadDotEnv: %v", err)
+	}
+	if stats.Found {
+		t.Fatal("stats.Found = true, want false")
+	}
+	if stats.Loaded != 0 || stats.Skipped != 0 {
+		t.Fatalf("unexpected stats: %+v", stats)
 	}
 }
 
@@ -131,5 +155,23 @@ func TestResolveCalDAVSettings_InvalidHost(t *testing.T) {
 	_, _, _, err := resolveCalDAVSettings(cfg)
 	if err == nil {
 		t.Fatal("expected invalid host error, got nil")
+	}
+}
+
+func TestParseDateBound(t *testing.T) {
+	start, err := parseDateBound("2026-06-15", false)
+	if err != nil {
+		t.Fatalf("parseDateBound start: %v", err)
+	}
+	if !start.Equal(time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("start = %v", start)
+	}
+
+	end, err := parseDateBound("2026-06-15", true)
+	if err != nil {
+		t.Fatalf("parseDateBound end: %v", err)
+	}
+	if !end.Equal(time.Date(2026, 6, 15, 23, 59, 59, 999999999, time.UTC)) {
+		t.Fatalf("end = %v", end)
 	}
 }

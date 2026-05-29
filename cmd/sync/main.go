@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 
@@ -22,6 +23,12 @@ const defaultAdvanceMinutes = 30
 
 const defaultEnvPath = ".env"
 
+type envLoadStats struct {
+	Found   bool
+	Loaded  int
+	Skipped int
+}
+
 func main() {
 	if err := Run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -35,14 +42,38 @@ func Run(args []string) error {
 	input := fs.String("input", "report.xlsx", "Path to the input xlsx file")
 	cfgPath := fs.String("config", "config.yaml", "Path to YAML config file")
 	fs.StringVar(cfgPath, "c", *cfgPath, "Path to YAML config file (alias)")
+	from := fs.String("from", "", "Start date for the sync window (YYYY-MM-DD)")
+	to := fs.String("to", "", "End date for the sync window (YYYY-MM-DD)")
 	includePast := fs.Bool("include-past", false, "Sync past events too (default: future only)")
 	dryRun := fs.Bool("dry-run", false, "Report changes without writing to the server")
+	verbose := fs.Bool("verbose", false, "Enable verbose logging")
+	fs.BoolVar(verbose, "v", false, "Enable verbose logging (alias)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
 		*input = fs.Arg(0)
 	}
+
+	start, err := parseDateBound(*from, false)
+	if err != nil {
+		return err
+	}
+	end, err := parseDateBound(*to, true)
+	if err != nil {
+		return err
+	}
+	if !start.IsZero() && !end.IsZero() && start.After(end) {
+		return fmt.Errorf("invalid sync window: from %s is after to %s", *from, *to)
+	}
+
+	logf := func(format string, a ...any) {
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[verbose] "+format+"\n", a...)
+		}
+	}
+
+	logf("starting sync: input=%q config=%q include_past=%t dry_run=%t from=%q to=%q", *input, *cfgPath, *includePast, *dryRun, *from, *to)
 
 	cfg, lines, err := config.LoadConfig(*cfgPath)
 	if err != nil {
@@ -55,14 +86,31 @@ func Run(args []string) error {
 		return fmt.Errorf("no caldav block in config — add caldav.url, caldav.username_env, caldav.password_env, and caldav.calendar_display_name")
 	}
 
-	if err := loadDotEnv(defaultEnvPath); err != nil {
+	dotEnvStats, err := loadDotEnv(defaultEnvPath)
+	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", defaultEnvPath, err)
 	}
+	if dotEnvStats.Found {
+		logf("loaded %s: set=%d skipped_existing=%d", defaultEnvPath, dotEnvStats.Loaded, dotEnvStats.Skipped)
+	} else {
+		logf("%s not found; using existing environment only", defaultEnvPath)
+	}
+
+	logf("credential env presence: %s=%t %s=%t ID=%t PASSWORD=%t HOST=%t",
+		cfg.CalDAV.UsernameEnv,
+		strings.TrimSpace(os.Getenv(cfg.CalDAV.UsernameEnv)) != "",
+		cfg.CalDAV.PasswordEnv,
+		strings.TrimSpace(os.Getenv(cfg.CalDAV.PasswordEnv)) != "",
+		strings.TrimSpace(os.Getenv("ID")) != "",
+		strings.TrimSpace(os.Getenv("PASSWORD")) != "",
+		strings.TrimSpace(os.Getenv("HOST")) != "",
+	)
 
 	calDAVCfg, username, password, err := resolveCalDAVSettings(cfg.CalDAV)
 	if err != nil {
 		return err
 	}
+	logf("resolved CalDAV URL=%q username_len=%d password_len=%d", calDAVCfg.URL, len(username), len(password))
 
 	loc, err := i18n.NewLocalizer(cfg.Locale)
 	if err != nil {
@@ -86,25 +134,47 @@ func Run(args []string) error {
 	fmt.Fprintf(os.Stderr, "%d events parsed\n", len(events))
 
 	ctx := context.Background()
+	connectStarted := time.Now()
+	logf("connecting to CalDAV server: begin")
 	client, err := caldav.New(ctx, calDAVCfg, username, password)
 	if err != nil {
 		return fmt.Errorf("caldav connect: %w", err)
 	}
+	logf("connecting to CalDAV server: done in %s", time.Since(connectStarted))
 
 	opts := caldav.SyncOptions{
 		IncludePast: *includePast,
+		Start:       start,
+		End:         end,
 		DryRun:      *dryRun,
+		Logf:        logf,
 	}
+	logf("syncing events: count=%d", len(events))
 	result, err := client.Sync(ctx, events, opts)
 	if err != nil {
 		return fmt.Errorf("sync failed: %w", err)
 	}
+	logf("sync completed: added=%d updated=%d deleted=%d unchanged=%d skipped=%d errors=%d",
+		result.Added,
+		result.Updated,
+		result.Deleted,
+		result.Unchanged,
+		result.Skipped,
+		len(result.Errors),
+	)
 
 	if *dryRun {
 		fmt.Print("[dry-run] ")
 	}
 	fmt.Printf("added=%d updated=%d deleted=%d unchanged=%d skipped=%d\n",
 		result.Added, result.Updated, result.Deleted, result.Unchanged, result.Skipped)
+
+	if result.ExcludedFromDeletionScope > 0 {
+		fmt.Fprintf(os.Stderr,
+			"note: %d managed remote events were excluded from deletion scope (outside sync window/past policy)\n",
+			result.ExcludedFromDeletionScope,
+		)
+	}
 
 	if len(result.Errors) > 0 {
 		fmt.Fprintf(os.Stderr, "%d error(s) during sync:\n", len(result.Errors))
@@ -116,15 +186,31 @@ func Run(args []string) error {
 	return nil
 }
 
-func loadDotEnv(path string) error {
+func parseDateBound(value string, endOfDay bool) (time.Time, error) {
+	if strings.TrimSpace(value) == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date %q, expected YYYY-MM-DD: %w", value, err)
+	}
+	if endOfDay {
+		return parsed.Add(24*time.Hour - time.Nanosecond), nil
+	}
+	return parsed, nil
+}
+
+func loadDotEnv(path string) (envLoadStats, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return envLoadStats{}, nil
 		}
-		return err
+		return envLoadStats{}, err
 	}
 	defer file.Close()
+
+	stats := envLoadStats{Found: true}
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -133,18 +219,20 @@ func loadDotEnv(path string) error {
 			continue
 		}
 		if _, exists := os.LookupEnv(key); exists {
+			stats.Skipped++
 			continue
 		}
 		if err := os.Setenv(key, value); err != nil {
-			return fmt.Errorf("set %s: %w", key, err)
+			return envLoadStats{}, fmt.Errorf("set %s: %w", key, err)
 		}
+		stats.Loaded++
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return envLoadStats{}, err
 	}
 
-	return nil
+	return stats, nil
 }
 
 func parseEnvLine(line string) (string, string, bool) {
